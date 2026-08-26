@@ -30,7 +30,7 @@ print(c("starting at"))
 Sys.time()
 
 print("Loading packages...")
-########################### load packages ###########################
+########################### Load packages ###########################
 library(tidyverse)
 library(edgeR)
 library(variancePartition)

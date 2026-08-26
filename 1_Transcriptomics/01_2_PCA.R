@@ -1,8 +1,8 @@
-# 01.2_PCA.R
+# 01_2_PCA.R
 
 ################################################################################
 
-# 1.3. PCA
+# 1.2. PCA
 
 ################################################################################
 
@@ -16,7 +16,7 @@ voom_inpath <- "rna-seq/analysis/data_preprocessing/vobjDream_NOform_2.rds"
 sample_info_inpath = "rna-seq/data/sample_covariates_clin_tech.csv"
 
 
-########################### load packages ###########################
+########################### Load packages ###########################
 library(tidyverse)
 library(stats)
 
@@ -36,7 +36,7 @@ Sys.time()
 print("writing data object")
 saveRDS(exp.pca, outpath)
 
-###########################  plot ########################### 
+########################### Plot ########################### 
 # read PCA back in
 exp.pca <- readRDS(outpath)
 # read in sample info for plotting 
