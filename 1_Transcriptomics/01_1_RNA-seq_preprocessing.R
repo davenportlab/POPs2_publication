@@ -1,4 +1,4 @@
-# 01.1_RNA-seq_preprocessing
+# 01.1_RNA-seq_preprocessing.R 
 
 ################################################################################
 
@@ -8,22 +8,21 @@
 
 # Aim: generate log2cpm count matrix for following analyses (including gene filtering)
 
-##### Output paths ##########################
+########################### Output paths ##########################
 # voom output file (.rds)
 voom_outpath = "rna-seq/analysis/data_preprocessing/vobjDream_NOform_2.rds"
 # cpm count matrix output file (.txt)
 cpm_counts_outpath = "rna-seq/analysis/data_preprocessing/star-fc-genecounts_log2cpm_filt_samples_HLApm_2.txt"
 
-##### Input paths ###########################
+########################### Input paths ###########################
 # raw count matrix as input
 raw_count_matrix_inpath = "rna-seq/data/star-fc-genecounts_3_filt_samples_HLApm.txt"
 # sample info input 
 sample_info_inpath = "rna-seq/data/sample_covariates_clin_tech.csv"
 
-##### Parameters ############################
+########################### Parameters ############################
 # voom formula (we use ~1 to make this count matrix generalizeable for future analyses)
 form <- ~ 1
-#############################################
 
 set.seed(1)
 
@@ -31,7 +30,7 @@ print(c("starting at"))
 Sys.time()
 
 print("Loading packages...")
-# load packages
+########################### load packages ###########################
 library(tidyverse)
 library(edgeR)
 library(variancePartition)
