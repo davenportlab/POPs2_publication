@@ -12,7 +12,7 @@
 outpath <- "rna-seq/analysis/data_preprocessing/expression_PCA.rds"
 
 ########################### Input paths ###########################
-voom_inpath <- "rna-seq/analysis/data_preprocessing/vobjDream_NOform_2.rds"
+cpm_counts_inpath <- "rna-seq/analysis/data_preprocessing/star-fc-genecounts_log2cpm_filt_samples_HLApm_2.txt"
 sample_info_inpath = "rna-seq/data/sample_covariates_clin_tech.csv"
 
 
@@ -20,11 +20,12 @@ sample_info_inpath = "rna-seq/data/sample_covariates_clin_tech.csv"
 library(tidyverse)
 library(stats)
 
-# read in voom object
-vobj <- readRDS(voom_inpath)
+########################### Load data ###########################
+counts <- read.table(cpm_counts_inpath, header = TRUE) 
 
+########################### Analysis ###########################
 # transpose counts
-cpm_counts_t <-t(vobj$E)
+cpm_counts_t <-t(counts)
 
 print("Doing PCA...")
 Sys.time()
@@ -51,7 +52,7 @@ eigs <- exp.pca$sdev^2
 # Calculate proportion of variation explained in PCs
 Proportion = eigs/sum(eigs)
 
-# Plot
+# Plot (Main figure 1B)
 pcs %>% rownames_to_column() %>%
   left_join(sample.info, by = c("rowname" = "RNA_sanger_sample_id")) %>%
   mutate(`Time-point` = gsub("_", " ", Sample_taken_at)) %>%

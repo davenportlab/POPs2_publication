@@ -30,7 +30,8 @@ mkdir Output
 # 7. Copy mixture file (made in 02_1_cibersort_prep.R) to Cibersort/Input/ (called cibersort_input_counts.tsv)
 
 # 8. Navigate to directory with files to analyze and run. 
-#.   Update your email and token where it is noted in the code below
+#    Update your email and token where it is noted in the code below
+#    Only takes a few mins to run.
 cd Cibersort
 docker run -v Cibersort/Input:/src/data -v Cibersort/Output:/src/outdir cibersortx/fractions --username <ADD YOUR EMAIL> --token <ADD YOUR TOKEN> --mixture cibersort_input_counts.tsv --sigmatrix LM22.txt --rmbatchBmode TRUE --perm 100 --verbose TRUE --QN FALSE
 

@@ -24,6 +24,7 @@ library(tidyverse)
 library(statmod)
 library(rtracklayer)
 
+########################### Load data ###########################
 # read in log2cpm counts (made with voom)
 counts <- read.table(cpm_counts_inpath, header = TRUE) %>%
   rownames_to_column(var = "ENSEMBL_ID")
@@ -37,6 +38,7 @@ HLA_update <- as.data.frame(rbind(c("HLA-DRB3", "HLA-DRB3"), c("HLA-DRB4", "HLA-
 colnames(HLA_update) <- c("gtf.gene_id", "gtf.gene_name")
 id_name <- rbind(data.frame(gtf$gene_id, gtf$gene_name) %>% distinct(), HLA_update)
 
+########################### Analysis ###########################
 # Change gene IDs to gene names
 counts_named <- counts %>% left_join(id_name, by = c("ENSEMBL_ID" = "gtf.gene_id")) %>%
   # do something about the HLAs 

@@ -2,7 +2,7 @@
 
 ################################################################################
 
-# 1.1. RNA-seq_preprocessing
+# 1.1. RNA-seq preprocessing
 
 ################################################################################
 
@@ -37,7 +37,7 @@ library(variancePartition)
 print("Packages loaded.")
 
 print("Loading data...")
-# load data 
+########################### Load data ###########################
 counts <- read.table(raw_count_matrix_inpath, row.names = 1, header = TRUE) 
 sample.info <- read.csv(sample_info_inpath) %>%
   # order by count matrix 
@@ -45,6 +45,7 @@ sample.info <- read.csv(sample_info_inpath) %>%
 
 print("Data loaded.")
 
+########################### Analysis ###########################
 print("Filtering genes...")
 ##### filter genes based on cpm ##### 
 # filter to genes with 10 reads per library size in at least 5% of the samples 
