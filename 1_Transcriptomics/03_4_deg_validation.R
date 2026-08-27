@@ -35,6 +35,7 @@ library(variancePartition)
 library(edgeR)
 library(BiocParallel)
 library(eulerr)
+library(ggpubr)
 
 ########################### Load data ###########################
 # load pops data
