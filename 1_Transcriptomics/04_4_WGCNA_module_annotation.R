@@ -410,7 +410,7 @@ module_annotation_df <- n_genes_per_mod %>%
   mutate(correlated_celltypes = ifelse(is.na(correlated_celltypes), "None", correlated_celltypes)) %>%
   left_join(enriched_regulons_per_mod, by = "Module") %>%
   mutate(enriched_regulons = ifelse(is.na(enriched_regulons), "None", enriched_regulons))
-# write this out 
+# write this out (Supplementary Table)
 module_annotation_df %>% write.table(file = paste0(outfiles_path, "module_annotation/module_annotation_df.txt"), row.names = FALSE, sep = "\t")
 # test reading it back in 
 mod_annot_df_in <- read.delim(paste0(outfiles_path, "module_annotation/module_annotation_df.txt"), sep = "\t")
