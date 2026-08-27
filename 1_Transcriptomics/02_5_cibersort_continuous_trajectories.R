@@ -66,7 +66,7 @@ sample_info_vp <- sample.info %>%
 # run variance partition on cell proportions (takes ~one minute)
 varPart <- fitExtractVarPartModel(var_part_cell_prop, variance_partition_formula, sample_info_vp)
 
-# plot variance parititon 
+# plot variance parititon (Supplementary Figure 22)
 plotVarPart(sortCols(varPart), , col = c(rep("white", 11), "grey85")) + 
   scale_x_discrete(labels=c("ANON_ID" = "Individual", 
                             "id_run_position" = "Sequencing\nbatch", 
