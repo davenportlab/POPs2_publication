@@ -27,6 +27,9 @@ gtf_inpath <- "rna-seq/data/ref_data/Homo_sapiens.GRCh38.99.gtf"
 form <- "~0+Sample_taken_at+(1|ANON_ID)+(1|id_run_position)"
 # specify variance partition formula
 variance_partition_formula <- "~(1|Sample_taken_at)+(1|ANON_ID)+(1|id_run_position)"
+# define deg cutoffs
+p_val = 0.01
+log_FC = log2(1.5)
 
 ########################### Load packages ###########################
 print("loading packages")
@@ -185,10 +188,6 @@ plotVarPart(sortCols(vp), , col = c(rep("white", 3), "grey85")) +
         axis.ticks = element_blank()) 
 
 # Volcano plot
-# define deg cutoffs
-p_val = 0.01
-log_FC = log2(1.5)
-
 # make annotation to add n DEGs
 n_degs <- toptable %>% 
   filter(abs(logFC) > log_FC, 
@@ -210,7 +209,6 @@ toptable %>%
                      values =c("no_change"= "#999999", 
                                "UP" = "black", 
                                "DOWN" = "black")) +
-  #ggrastr::geom_point_rast(shape = 19, show.legend = FALSE, size = 0.5) +
   geom_point(shape = 19, show.legend = FALSE, size = 0.5) +
   geom_hline(yintercept = -log10(p_val), linetype="longdash", colour="grey", size=0.5) +
   geom_vline(xintercept = log_FC, linetype="longdash", colour="#999999", size=0.5) +
