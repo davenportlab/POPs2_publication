@@ -1,8 +1,8 @@
-# 04_3_module_time_series_modeling.R
+# 04_4_module_time_series_modeling.R
 
 ################################################################################
 
-# 4.3. Time-series modeling of WGCNA modules
+# 4.4. Time-series modeling of WGCNA modules
 
 ################################################################################
 
@@ -16,6 +16,13 @@ outfiles_path <- "rna-seq/analysis/WGCNA/outputs/"
 sample_info_inpath = "rna-seq/data/sample_covariates_clin_tech.csv"
 # eigengenes
 eigengenes_inpath <- "rna-seq/analysis/WGCNA/outputs/eigengenes_consensus_signed_hybrid.csv"
+# connectivity
+connectivity_inpath <- "rna-seq/analysis/WGCNA/outputs/connectivity_consensus_signed_hybrid.csv"
+# gtf file for gene id to gene name conversion
+gtf_inpath <- "rna-seq/data/ref_data/Homo_sapiens.GRCh38.99.gtf"
+# module pathway enrichment
+pathway_enrichment_inpath <- "rna-seq/analysis/WGCNA/outputs/module_annotation/module_XGR_results_concise_reactome.rds"
+
 
 ########################### Parameters ############################
 
@@ -37,6 +44,12 @@ theme_set(theme_bw() + theme(panel.grid = element_blank(),
 sample.info <- read.csv(sample_info_inpath)
 # eigengenes
 eigengenes <- read.csv(eigengenes_inpath, row.names = 1)
+# connectivity
+connectivity <- read.csv(connectivity_inpath, row.names = 1)
+# read in gtf file
+gtf <- rtracklayer::import(gtf_inpath)
+# read in module pathway enrichment
+list_concise_eTerm_reactome <- readRDS(pathway_enrichment_inpath)
 
 ########################### Analysis ###########################
 
@@ -212,7 +225,7 @@ for (eigengene in colnames(eigengenes)) {
 }
 
 # Based on these models, make time series predictions for each module 
-# This is an initial view of Main Figure 2, but the full figure will be created later 
+# This is an initial view of Main Figure 2, but the final figure will be created later 
 lme_prediction_df %>% 
   mutate(Module = factor(as.numeric(gsub("ME_", "", Module)))) %>% 
   ggplot(aes(x = SampleGA)) + 
@@ -230,3 +243,118 @@ dend_rotated <- dendextend::rotate(dendrogram, order = c(1, 3, 7, 14, 15, 8, 4, 
 module_order <- gsub("ME_", "", labels(dend_rotated))
 # Plot the dendrogram (Supplementary Figure 11)
 plot(dend_rotated, main = "Clustered module eigengenes")
+
+################################################################################
+# Create module figure (Main Figure 2)
+################################################################################
+
+# Prepare gene ID key 
+HLA_update <- as.data.frame(rbind(c("HLA-DRB3", "HLA-DRB3"), c("HLA-DRB4", "HLA-DRB4")))
+colnames(HLA_update) <- c("gtf.gene_id", "gtf.gene_name")
+id_name <- rbind(data.frame(gtf$gene_id, gtf$gene_name) %>% distinct(), HLA_update)
+
+# Prep module annotations
+# top 5 hub genes per mod (as a string)
+top_5_hub_genes_per_module_cat <- connectivity %>%
+  rownames_to_column(var = "gtf.gene_id") %>%
+  left_join(id_name) %>%
+  # find top kWithin for each module 
+  group_by(Module) %>%
+  top_n(n = 5, kWithin) %>%
+  select(Module, gtf.gene_name) %>%
+  group_by(Module) %>%
+  mutate(top_5_hub_genes = paste(gtf.gene_name, collapse = ", ")) %>%
+  select(-gtf.gene_name) %>% distinct() %>%
+  mutate(Module = gsub("Module_", "", Module))
+
+# top pathways 
+# make a df
+top_3_pathways_per_module_cat <- c()
+for(i in 1:length(list_concise_eTerm_reactome)){
+  pathways <- xEnrichViewer(list_concise_eTerm_reactome[[i]], 
+                            top_num = length(list_concise_eTerm_reactome[[i]]$annotation)) %>% 
+    filter(adjp < 0.05) %>% 
+    arrange(desc(fc)) %>% 
+    select(name, adjp, fc) %>% 
+    top_n(n = 3, wt = fc) %>%
+    mutate(Module = names(list_concise_eTerm_reactome)[[i]]) 
+  top_3_pathways_per_module_cat <- rbind(top_3_pathways_per_module_cat, pathways)
+}
+top_3_pathways_per_module_cat_2 <- top_3_pathways_per_module_cat %>%
+  select(Module, name) %>%
+  # remove trailing spaces
+  mutate(name = stringr::str_trim(name), 
+         name = ifelse(name == "Nucleotide-binding domain, leucine rich repeat containing receptor (NLR) signaling pathways", "NLR signaling pathways", name),
+         name = ifelse(name == "Respiratory electron transport, ATP synthesis by chemiosmotic coupling, and heat production by uncoupling proteins.", "Mitochondrial respiration and heat production", name),
+         name = ifelse(name == "RUNX1 regulates genes involved in megakaryocyte differentiation and platelet function", "RUNX1 regulation of megakaryocyte and platelet genes", name),
+         name = ifelse(name == "Hh mutants that don't undergo autocatalytic processing are degraded by ERAD", "ERAD degrades unprocessed Hh mutants", name),
+         name = ifelse(name == "Antigen activates B Cell Receptor (BCR) leading to generation of second messengers", "Antigen activates BCR triggering second messengers", name),
+         name = ifelse(name == "Immunoregulatory interactions between a Lymphoid and a non-Lymphoid cell", "Lymphoid-non-Lymphoid immunoregulatory interactions", name),
+         name = ifelse(name == "Formation of the ternary complex, and subsequently, the 43S complex", "Formation of ternary and 43S complexes", name)) %>%
+  group_by(Module) %>%
+  mutate(top_3_pathways = paste(name, collapse = "\n")) %>% 
+  select(-name) %>% distinct() %>% 
+  mutate(Module = gsub("Module_", "", Module)) 
+
+mod_functions <- c("Innate immune response (m1)", 
+                   "Cell proliferation (m2)", 
+                   "Cell motility (m3)", 
+                   "T cell immune response (m4)", 
+                   "Protein synthesis/translation (m5)",
+                   "B cell immune response (m6)",
+                   "Eosinophil allergic-like response (m7)",
+                   "Cytotoxic immune response (m8)",
+                   "Protein sythesis/translation (m9)",
+                   "Coagulation/clotting (m10)",
+                   "Histones (m11)",
+                   "Mitochondria/energy production (m12)",
+                   "Small molecule transport (m13)",
+                   "Antiviral interferon response (m14)",
+                   "Inflammatory response regulation (m15)", 
+                   "Unassigned")
+
+mod_functions_df <- as.data.frame(cbind(Module = c(1:15, "Unassigned"), mod_functions))
+
+# join these annotations into one string
+annotations <- top_5_hub_genes_per_module_cat %>% 
+  left_join(top_3_pathways_per_module_cat_2 , by = "Module") %>%
+  mutate(top_3_pathways = ifelse(is.na(top_3_pathways), "None significant", top_3_pathways),
+         joined_annot = paste0(top_5_hub_genes, "\n", top_3_pathways)) %>%
+  left_join(mod_functions_df, by = "Module")
+
+custom_labels <- setNames(annotations$mod_functions, annotations$Module)
+
+
+module_name_labels <- as.data.frame(cbind(Module = annotations$Module[1:15], 
+                                          xpos = rep(11.6, 15), 
+                                          ypos = rep(0.015, 15),#rep(-0.02, 15), 
+                                          label = annotations$joined_annot[1:15])) %>%
+  mutate(xpos = as.numeric(xpos), ypos = as.numeric(ypos),
+         Module = factor(Module, levels = module_order))
+
+lme_prediction_df %>% 
+  mutate(Module = gsub("ME_", "", Module), 
+        Module = factor(Module, levels = module_order)) %>%
+  ggplot(aes(x = SampleGA)) + 
+  geom_line(aes(SampleGA, pred_eig_val), size = 1.7, color = "#32769B") +
+  geom_ribbon(aes(SampleGA, pred_eig_val, ymin = conf.low, ymax = conf.high), alpha = 0.055, fill = "#32769B") + 
+  ylab("Module eigengene") + xlab("Sample gestational age (weeks)") + 
+  facet_wrap(~Module, ncol = 3, labeller = labeller(Module = custom_labels)) + 
+  #ggtitle("Module trajectories") + 
+  theme(legend.position = "none",
+        strip.background = element_blank(),#element_rect(fill = "white", color = "black"),
+        axis.text.y=element_blank(),
+        plot.title = element_text(size = 20),
+        axis.title = element_text(size = 15),
+        axis.text = element_text(size = 15),
+        strip.text = element_text(size = 14)) + 
+  scale_x_continuous(expand = c(0.02,0),
+                     breaks = c(12, 20, 28, 36)) +
+  geom_text(
+    data = module_name_labels,
+    aes(x = xpos, y = ypos, label = label),
+    hjust = 0, vjust = 0.95,
+    #fontface = "bold",
+    inherit.aes = FALSE,
+    size = 3
+  )
