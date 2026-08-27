@@ -62,7 +62,7 @@ print("packages loaded")
 print("Loading data...")
 # load voom object
 vobjDream <- readRDS(voom_obj_inpath)
-# read in metadata that shows which samples we will use 
+# read in metadata  
 sample.info <- read.csv(sample_info_inpath)
 # read in gtf file
 gtf <- rtracklayer::import(gtf_inpath)
