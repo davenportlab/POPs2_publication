@@ -15,7 +15,7 @@
 #       https://github.com/jackgisby/covid-longitudinal-multi-omics/blob/v1.0/notebooks/4_module_analysis.md
 
 ########################### Output paths ##########################
-outfiles_path <- "rna-seq/analysis/WGCNA/outputs/outputs_WGCNA_consensus/sep_preprocessing/"
+outfiles_path <- "rna-seq/analysis/WGCNA/outputs/sep_preprocessing/"
 
 ########################### Input paths ###########################
 # sample info input 
@@ -135,7 +135,7 @@ get_TOM <- function(counts_sub, tp){
     ggplot() +
     geom_text(aes(x=Power, y=mean.k., label=Power)) +
     xlab("Soft Threshold Power") + ylab("Mean Connectivity") + geom_hline(yintercept = 100)
-  # Write out the plots to evaluate later 
+  # Write out the plots to evaluate later (Supplementary Figure 24)
   soft_thresh <- gridExtra::grid.arrange(p1 + labs(tag = "A"), p2 + labs(tag = "B"), nrow=1)
   ggsave(paste0(outfiles_path, "soft.thresh.plt_tp", tp, ".pdf"), soft_thresh, width = 9, height = 4)
   # Print soft threshold value
