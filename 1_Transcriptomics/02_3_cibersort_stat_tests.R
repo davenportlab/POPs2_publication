@@ -13,8 +13,6 @@
 cell_prop_change_bonf_pvals_outpath = "rna-seq/analysis/cibersort/outputs/cell_prop_change_timepoints_bonf_pvals.csv"
 # bonferoni adjusted p-values and cell proportion mean differences for cell proportion changes across time points
 cell_prop_change_all_results_outpath = "rna-seq/analysis/cibersort/outputs/cell_prop_change_timepoints_all_results.csv"
-# bonferoni adjusted p-values for cell proportion changes across seasons
-season_change_cell_prop_pvals_outpath = "rna-seq/analysis/cibersort/outputs/cell_prop_change_seasons_bonf_pvals.csv"
 
 ########################### Input paths ###########################
 # cibersort output 
@@ -163,41 +161,3 @@ cell_prop_changes_info <- cell_prop_changes_adj_pval %>%
 # write out this df
 cell_prop_changes_info %>%
   write.csv(file = cell_prop_change_all_results_outpath, quote = FALSE, row.names = FALSE)
-
-# Check for differences in distribution of cell prop at each time point by season 
-# Use Kruskal-Wallis test
-season_changes_pval <- c("cell type", "12_weeks", "20_weeks", "28_weeks", "36_weeks")
-# list time points
-time_points <- unique(cell_prop$Sample_taken_at)
-
-# for each cell type
-for(i in 1:length(cell_types)){
-  # make list for p-vals
-  cell_type_pvals <- c(cell_types[i])
-  # test for differences between all possible time point combinations
-  for(j in 1:length(time_points)){
-    # make data subset
-    dat_sub <- cell_prop %>% filter(Sample_taken_at == time_points[j]) %>% select(cell_types[i], Season)
-    # perform kruskal wallace test
-    p_val <- (kruskal.test(get(cell_types[i]) ~ Season,
-                           data = dat_sub)[[3]])
-    cell_type_pvals <- c(cell_type_pvals, p_val)
-  }  
-  season_changes_pval <- rbind(season_changes_pval, cell_type_pvals)
-}
-
-# format seasonal cell prop changes significance
-season_changes_pval_df <- as.data.frame(season_changes_pval)
-colnames(season_changes_pval_df) <- season_changes_pval_df[1,]
-season_changes_pval_df <- season_changes_pval_df[-1,]
-rownames(season_changes_pval_df) <- season_changes_pval_df[,1]
-season_changes_pval_df <- season_changes_pval_df[,-1]
-season_changes_pval_df <- season_changes_pval_df %>% mutate_all(., as.numeric)
-
-# Correct for multiple testing burden - adjust using p.adjust
-season_changes_adj_pval <- season_changes_pval_df %>% as.matrix() %>% as.vector() %>% p.adjust(method = "bonferroni") %>% matrix(nrow = 22) %>% as.data.frame()
-# format 
-colnames(season_changes_adj_pval) <- colnames(season_changes_pval_df)
-rownames(season_changes_adj_pval) <- rownames(season_changes_pval_df)
-# write this out
-write.csv(season_changes_adj_pval, file = season_change_cell_prop_pvals_outpath, quote = FALSE)
