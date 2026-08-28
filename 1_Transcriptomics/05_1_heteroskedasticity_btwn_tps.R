@@ -173,6 +173,7 @@ n_degs <- heterosk_res %>%
   group_by(comp) %>%
   summarize(n = n())
 
+# Main figure 3A
 heterosk_res %>% 
   left_join(n_degs, by = "comp") %>%
   mutate(reg = ifelse(((log2FC > log_FC) & (BH_adj_pval_within_tp < p_val)), "UP", 
