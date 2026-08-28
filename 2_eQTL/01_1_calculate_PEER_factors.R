@@ -179,3 +179,13 @@ cibersort %>% mutate(Neutrophils = scale(Neutrophils, center = TRUE, scale = FAL
   facet_wrap(~celltype, scales = "free") + 
   labs(title = "Distributions of imputed cell proportions centered around zero",
        x = "Centered imputed cell proportion")
+
+# Density plot of time points. (Supplementary Figure 32)
+sample.info %>%
+  mutate(`Sample\ntime-point` = gsub("_", " ", Sample_taken_at)) %>%
+  ggplot(aes(x = SampleGA, fill = `Sample\ntime-point`)) + 
+  geom_density() + 
+  scale_fill_manual(values=c("#BCE4D8", "#83C4CB", "#439FB7", "#32769B")) + 
+  scale_x_continuous(breaks = c(12, 20, 28, 36)) + 
+  ggtitle("Distribution of gestational age by sample time-point") +
+  xlab("Gestational age (weeks)")
