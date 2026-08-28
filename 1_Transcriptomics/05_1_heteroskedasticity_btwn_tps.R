@@ -11,6 +11,7 @@
 
 ########################### Output paths ##########################
 outfile="rna-seq/analysis/variance/results/heteroskedasticity_betweentimepoints.tsv"
+outfile_corrected="rna-seq/analysis/variance/results/adj_heteroskedasticity_betweentimepoints.tsv"
 
 ########################### Input paths ###########################
 # sample info 
@@ -41,12 +42,23 @@ read.fast=function(fname,sep="\t",col.names=TRUE,row.names=TRUE){
   return(df)   
 }
 
+# Set cutoffs for plotting 
+log_FC <- log2(1.5)
+p_val <- 0.05
+
 ########################### Load packages ###########################
 library(dplyr)
 library(ggplot2)
 library(stringr)
 library(onewaytests)
 library(car)
+
+# set ggplot theme 
+theme_set(theme_bw() + theme(panel.grid = element_blank(), 
+                             plot.title = element_text(hjust = 0.5),
+                             plot.subtitle = element_text(hjust = 0.5),
+                             axis.ticks = element_blank(),
+                             strip.background = element_blank()))
 
 ########################### Load data ###########################
 message("Reading data...")
@@ -132,4 +144,60 @@ res_df$log2FC=log2(res_df$variance_ratio)
 message("Writing out data...")
 write.table(res_df,outfile,quote=F,row.names=F,col.names=T,sep="\t")
 
+# Perform multiple testing correction the same way it was done
+# in the dream differntial expression analysis: 
+#       Within each time-point comparison, perform BH correction 
+# in topTable default adjust.method = "BH"
+var_tests <- read.delim(outfile)
+
+var_tests_update <- var_tests %>% group_by(timepoints) %>%
+  mutate(BH_adj_pval_within_tp = p.adjust(pval, method = "BH")) %>%
+  ungroup() 
+
+
+# write out df with new p-values
+var_tests_update %>% write.table(file = outfile_corrected, sep = "\t", row.names = FALSE)
+
 message("Done!")
+
+########################### Plot ###########################
+
+heterosk_res <- read.delim(outfile_corrected) %>%
+  mutate(comp = gsub("weeks", "", gsub("weeks_vs_", "v", gsub("timepoint_", "", timepoints))))
+
+# Volcano plots
+# make annotation to add n DEGs
+n_degs <- heterosk_res %>% 
+  dplyr::filter(abs(log2FC) > log_FC, 
+                BH_adj_pval_within_tp < p_val) %>% 
+  group_by(comp) %>%
+  summarize(n = n())
+
+heterosk_res %>% 
+  left_join(n_degs, by = "comp") %>%
+  mutate(reg = ifelse(((log2FC > log_FC) & (BH_adj_pval_within_tp < p_val)), "UP", 
+                      ifelse(((log2FC < -log_FC) & (BH_adj_pval_within_tp < p_val)), "DOWN", "no_change")), 
+         BH_adj_pval_within_tp = ifelse(BH_adj_pval_within_tp < .Machine$double.xmin, .Machine$double.xmin, BH_adj_pval_within_tp),
+         comp = paste0(comp, ", n significant = ", n)
+  ) %>%
+  ggplot(aes(x=log2FC, y=-log10(BH_adj_pval_within_tp),# text = paste("Symbol:", gtf.gene_name), label = gtf.gene_name,
+             color = reg)) +
+  scale_color_manual(name = "reg",
+                     values =c("no_change"= "#999999", 
+                               "UP" = "black", 
+                               "DOWN" = "black")) +
+  geom_point(shape = 19, show.legend = FALSE, size = 0.5) +
+  geom_hline(yintercept = -log10(p_val), linetype="longdash", colour="grey", size=0.5) +
+  geom_vline(xintercept = log_FC, linetype="longdash", colour="#999999", size=0.5) +
+  geom_vline(xintercept = -log_FC, linetype="longdash", colour="#999999", size=0.5) + 
+  # labs(title="Volcano plots of differentially variable genes for all time-point contrasts") + #,
+  #      #subtitle = paste("Fold-change > 1.5, adj.P.Val < 0.05")) + 
+  theme(legend.position="none", 
+        plot.title = element_text(size = 15),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        strip.text = element_text(size = 13)) + 
+  coord_cartesian(clip = "off") + 
+  xlab("Log 2 fold change") + 
+  ylab("-log10(adjusted p-value)") + 
+  facet_wrap(~comp, scales = "free", nrow = 2)

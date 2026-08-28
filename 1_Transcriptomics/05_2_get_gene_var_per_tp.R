@@ -98,7 +98,6 @@ for(tp in unique(meta$Sampletakenat)){
 message("Writing out data...")
 genes=gsub("_","-",genes)
 res=data.frame(timepoint=tps,gene=genes,uncorrected_variance=uncor_vars,variance=vars,uncorrected_mean=uncor_means,mean=means)
-#saveRDS(res,outfile)
 write.table(res,outfile,quote=F,row.names=F,col.names=T,sep="\t")
 
 message("Done!")
