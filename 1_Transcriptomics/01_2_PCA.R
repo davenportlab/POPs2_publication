@@ -22,6 +22,8 @@ library(stats)
 
 ########################### Load data ###########################
 counts <- read.table(cpm_counts_inpath, header = TRUE) 
+# read in sample info for plotting 
+sample.info <- read.csv(sample_info_inpath) 
 
 ########################### Analysis ###########################
 # transpose counts
@@ -40,8 +42,6 @@ saveRDS(exp.pca, outpath)
 ########################### Plot ########################### 
 # read PCA back in
 exp.pca <- readRDS(outpath)
-# read in sample info for plotting 
-sample.info <- read.csv(sample_info_inpath) 
 
 # extract PCs
 pcs <- data.frame(exp.pca$x)
