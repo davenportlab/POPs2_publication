@@ -17,7 +17,7 @@ sample_info_inpath = "rna-seq/data/sample_covariates_clin_tech.csv"
 cibersort_inpath <- "rna-seq/analysis/cibersort/outputs/CIBERSORTx_Adjusted.txt"
 pca_inpath <- "genotyping/analysis/eQTL/input_data/POPS2_genotyping_imputed_eQTL_pca.eigenvec"
 geno_samples_inpath <- "genotyping/analysis/eQTL/input_data/genotyping_samples_filt_unrelated_w_rna_inds.txt"
-geno_rna_key <- "genotyping/data/genotyping_ANON_ID_key.csv"
+geno_ANONID_key <- "genotyping/data/genotyping_ANON_ID_key.csv"
 
 ########################### Parameters ############################
 
@@ -29,7 +29,7 @@ sample.info <- read.csv(sample_info_inpath)
 cibersort <- read.delim(cibersort_inpath)
 plink.pca <- read.table(pca_inpath)
 geno_samples_eQTL <- read.delim(geno_samples_inpath)
-geno_anonid_key <-  read.csv(geno_rna_key) 
+geno_anonid_key <-  read.csv(geno_ANONID_key) 
 
 ########################### Analysis ###########################
 
@@ -119,7 +119,7 @@ counts.eQTL %>% write.table(file = paste0(output_dir, "logcpm_gene_counts_t_for_
 ################################################################################
 #                     RUN PEER IN BASH
 ################################################################################
-# # run peer factors by running the following code in bash 
+# # run peer factors by running the following code in bash (-M3000 and normal queue work)
 # # cd to the correct dir
 # cd genotyping/analysis/PEER/output
 # # load the module with peertools v20120508
@@ -158,10 +158,10 @@ PC_plt4 <- plink.pca %>%
   geom_point(size = 0.5) +
   labs(x = "PC7", y = "PC8")
 
-PCA_plt <- gridExtra::grid.arrange(PC_plt1,# + labs(tag = "C"),
-                                   PC_plt2,# + labs(tag = ""),
-                                   PC_plt3,# + labs(tag = ""),
-                                   PC_plt4,# + labs(tag = ""),
+PCA_plt <- gridExtra::grid.arrange(PC_plt1,
+                                   PC_plt2,
+                                   PC_plt3,
+                                   PC_plt4,
                                    ncol = 2, nrow = 2, 
                                    widths = c(1, 1), 
                                    heights = c(1, 1),
