@@ -25,8 +25,11 @@ library(tidyverse)
 library(ggeffects)
 
 # set ggplot theme 
-theme_set(theme_bw() + theme(panel.grid = element_blank(),
-                             text=element_text(size=15)))
+theme_set(theme_bw() + theme(panel.grid = element_blank(), 
+                             plot.title = element_text(hjust = 0.5),
+                             plot.subtitle = element_text(hjust = 0.5),
+                             axis.ticks = element_blank(),
+                             strip.background = element_blank()))
 
 ########################### Load data ###########################
 # make sample info df
@@ -38,8 +41,7 @@ eigengenes <- read.csv(eigengenes_inpath, row.names = 1)
 # sample info 
 sample.info <- sample.info %>%
   mutate(pn_gdm = as.factor(pn_diabetes_3cat == 2), 
-         sga = as.factor(BW_Centile_Br1990 < 10),
-         pn_ptd_sp = as.factor(pn_ptd_sp == 1))
+         sga = BW_Centile_Br1990 < 10)
 
 ################################################################################
 # GDM, 30 individuals, 0 module with differential trajectories 
@@ -277,8 +279,8 @@ if(nrow(lme_interaction_signif_sptd %>% filter(time.group.interaction_pval < 0.0
     ylab("Module eigengene value") + xlab("Sample gestational age (weeks)") + 
     facet_wrap(~Module, scales = "free", ncol = 3) + 
     theme(strip.background = element_blank()) + 
-    scale_fill_manual(values = c("#F4777F", "#73A2C6")) + 
-    scale_color_manual(values = c("#F4777F", "#73A2C6")) + 
+    scale_fill_manual(values = c("#73A2C6", "#F4777F")) + 
+    scale_color_manual(values = c("#73A2C6", "#F4777F")) + 
     ggtitle(paste0("WGCNA module eigengene values modeled over time\nSpontaneous preterm delivery (n=", n_ind_sptd, ") differential continuous trajectory")) 
 }else{
   print("There are no significant interactions with small for gestational age")
@@ -323,39 +325,12 @@ pe_label_df <- pe_plot_df %>%
   summarise(
     x = max(SampleGA),
     y = max(conf.high),
-    p = first(time.group.interaction_pval),
+    p = as.numeric(dplyr::first(time.group.interaction_pval)),
     .groups = "drop"
   ) %>%
   mutate(
     p = as.numeric(p),
     label = paste0("pint = ", signif(p, 3))
-  )
-
-pe_mod_plt <- pe_plot_df %>%
-  ggplot(aes(x = SampleGA, group = `Pre-eclampsia`, fill = `Pre-eclampsia`)) + 
-  scale_fill_manual(values = c("#73A2C6", "#F4777F")) + 
-  scale_color_manual(values = c("#73A2C6", "#F4777F")) + 
-  geom_line(aes(x = SampleGA, y = pred_eig_val, color = `Pre-eclampsia`), size = 1.7) +
-  geom_ribbon(aes(SampleGA, pred_eig_val, ymin = conf.low, ymax = conf.high, fill = `Pre-eclampsia`), alpha = 0.055) + 
-  ylab("Module eigengene value") + xlab("Gestational age (weeks)") + 
-  facet_wrap(~Module, scales = "free", ncol = 3, labeller = labeller(Module = custom_labels)) + 
-  theme(legend.position = "inside", 
-        legend.position.inside =  c(0.5, 0.9),
-        legend.direction = "horizontal",
-        axis.text.y=element_blank(),
-        plot.title = element_text(size = 15),
-        axis.title = element_text(size = 15),
-        axis.text = element_text(size = 15),
-        strip.text = element_text(size = 15)) + 
-  ggtitle(paste0("Modules with different trajectory")) + 
-  scale_x_continuous(breaks = c(12, 20, 28, 36)) + 
-  geom_text(
-    data = pe_label_df,
-    aes(x = x, y = y, label = label),
-    inherit.aes = FALSE,
-    hjust = 1,
-    vjust = 1,
-    size = 4
   )
 
 pe_mod_plt_paper_sup <- pe_plot_df %>%
@@ -403,38 +378,13 @@ sga_label_df <- sga_plot_df %>%
   summarise(
     x = max(SampleGA),
     y = max(conf.high),
-    p = first(time.group.interaction_pval),
+    p = as.numeric(dplyr::first(time.group.interaction_pval)),
     .groups = "drop"
   ) %>%
   mutate(
     p = as.numeric(p),
     label = paste0("pint = ", signif(p, 2))
   ) 
-
-sga_mod_plt <- sga_plot_df %>%
-  ggplot(aes(x = SampleGA, group = SGA, fill = SGA)) + 
-  geom_line(aes(x = SampleGA, y = pred_eig_val, color = SGA), size = 1.7) +
-  geom_ribbon(aes(SampleGA, pred_eig_val, ymin = conf.low, ymax = conf.high, fill = SGA), alpha = 0.055) + 
-  ylab("Module eigengene value") + xlab("Gestational age (weeks)") + 
-  facet_wrap(~Module, scales = "free", ncol = 3, labeller = labeller(Module = custom_labels)) + 
-  theme(legend.position = "top",
-        axis.text.y=element_blank(),
-        plot.title = element_text(size = 15),
-        axis.title = element_text(size = 15),
-        axis.text = element_text(size = 15),
-        strip.text = element_text(size = 15)) + 
-  scale_fill_manual(values = c("#73A2C6", "#F4777F")) + 
-  scale_color_manual(values = c("#73A2C6", "#F4777F")) + 
-  ggtitle(paste0("Modules with differential trajectory")) + 
-  scale_x_continuous(breaks = c(12, 20, 28, 36)) + 
-  geom_text(
-    data = sga_label_df,
-    aes(x = x, y = y, label = label),
-    inherit.aes = FALSE,
-    hjust = 1,
-    vjust = 1,
-    size = 4
-  )
 
 sga_mod_plt_paper_sup <- sga_plot_df %>%
   ggplot(aes(x = SampleGA, group = SGA, fill = SGA)) + 
@@ -481,40 +431,13 @@ sptd_label_df <- sptd_plot_df %>%
   summarise(
     x = max(SampleGA),
     y = max(conf.high),
-    p = first(time.group.interaction_pval),
+    p = as.numeric(dplyr::first(time.group.interaction_pval)),
     .groups = "drop"
   ) %>%
   mutate(
     p = as.numeric(p),
     label = paste0("pint = ", signif(p, 2))
   ) 
-
-sptd_mod_plt <- sptd_plot_df %>%
-  ggplot(aes(x = SampleGA, group = `Spontaneous preterm delivery`, fill = `Spontaneous preterm delivery`)) + 
-  geom_line(aes(x = SampleGA, y = pred_eig_val, color = `Spontaneous preterm delivery`), size = 1.7) +
-  geom_ribbon(aes(SampleGA, pred_eig_val, ymin = conf.low, ymax = conf.high, fill = `Spontaneous preterm delivery`), alpha = 0.055) + 
-  ylab("Module eigengene value") + xlab("Gestational age (weeks)") + 
-  facet_wrap(~Module, scales = "free_y", ncol = 1, labeller = labeller(Module = custom_labels)) + 
-  theme(legend.position = "top",
-        axis.text.y=element_blank(),
-        plot.title = element_text(size = 15),
-        axis.title = element_text(size = 15),
-        axis.text = element_text(size = 15),
-        strip.text = element_text(size = 12)) + 
-  scale_fill_manual(values = c("#73A2C6", "#F4777F"),
-                    name = "sPTB") + 
-  scale_color_manual(values = c("#73A2C6", "#F4777F"),
-                     name = "sPTB") + 
-  ggtitle(paste0("Modules w different trajectory")) + 
-  scale_x_continuous(breaks = c(12, 20, 28, 36)) + 
-  geom_text(
-    data = sptd_label_df,
-    aes(x = x, y = y, label = label),
-    inherit.aes = FALSE,
-    hjust = 1,
-    vjust = 1,
-    size = 4
-  )
 
 sptd_mod_plt_paper_sup <- sptd_plot_df %>%
   ggplot(aes(x = SampleGA, group = `Spontaneous preterm delivery`, fill = `Spontaneous preterm delivery`)) + 
@@ -542,31 +465,6 @@ sptd_mod_plt_paper_sup <- sptd_plot_df %>%
     vjust = 1,
     size = 4
   )
-
-# sptd_mod_single_main <- lme_prediction_df_sptd %>% 
-#   filter(Module == "ME_6") %>%
-#   # join to interaction p vals 
-#   mutate(Module = as.factor(as.numeric(gsub("ME_", "", Module))),
-#          `Spontaneous preterm delivery` = ifelse(group == 1, TRUE, FALSE)) %>%
-#   ggplot(aes(x = SampleGA, group = `Spontaneous preterm delivery`, fill = `Spontaneous preterm delivery`)) + 
-#   geom_line(aes(x = SampleGA, y = pred_eig_val, color = `Spontaneous preterm delivery`), size = 1.7) +
-#   geom_ribbon(aes(SampleGA, pred_eig_val, ymin = conf.low, ymax = conf.high, fill = `Spontaneous preterm delivery`), alpha = 0.055) + 
-#   ylab("Module eigengene value") + xlab("Gestational age (weeks)") + 
-#   facet_wrap(~Module, scales = "free_y", ncol = 1, labeller = labeller(Module = custom_labels)) + 
-#   theme(
-#         axis.text.y=element_blank(),
-#         plot.title = element_text(size = 15),
-#         axis.title = element_text(size = 15),
-#         axis.text = element_text(size = 15),
-#         strip.text = element_text(size = 15)) + 
-#   scale_fill_manual(values = c("#73A2C6", "#F4777F"),
-#                     name = "sPTB") + 
-#   scale_color_manual(values = c("#73A2C6", "#F4777F"),
-#                      name = "sPTB") + 
-#   ggtitle(paste0("Module with different trajectory in sPTB")) + 
-#   scale_x_continuous(breaks = c(12, 20, 28, 36))
-# ggsave(paste0(plt_outpath, 'sPTB_mod6_main.pdf'), sptd_mod_single_main, width = 5, height = 4, useDingbats = FALSE)
-
 
 # paste all together to make sup figure for paper
 all_mod_traj_sup <- gridExtra::grid.arrange(pe_mod_plt_paper_sup + labs(tag = "A"), 
