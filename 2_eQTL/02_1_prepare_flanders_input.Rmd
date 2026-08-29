@@ -20,7 +20,7 @@ library(data.table)
 # Set out path 
 pops_lustre_path <- "genotyping/analysis/eQTL/"
 outpath <- paste0(pops_lustre_path, "input_data/flanders/")
-interval_path <- "interval_rna/"
+interval_path <- "interval_rna/" 
 ```
 
 We will fine-map and colocalize the following summary stats
