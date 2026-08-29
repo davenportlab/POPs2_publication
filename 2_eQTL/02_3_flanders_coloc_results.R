@@ -12,7 +12,7 @@
 # specify paths 
 path_lustre <- "genotyping/analysis/eQTL/"
 path <- paste0(path_lustre, "output_data/flanders_5/flanders_output/results/")
-interval_path <- "/lustre/scratch124/humgen/projects_v2/interval_rna/recovery_intermediate_files/INTERVAL_RNAseq/"
+interval_path <- "INTERVAL_RNAseq/"
 
 ########################### Input paths ###########################
 # gtf file for gene id to gene name conversion
