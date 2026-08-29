@@ -43,7 +43,6 @@ genes_gtf <- gtf[gtf$type == "gene"]
 
 # coloc results
 coloc.results <- read.delim(paste0(path, "coloc/coloc_run_colocalization.table.all.tsv")) %>% arrange(desc(PP.H4.abf))
-coloc.info <- read.csv(paste0(path, "coloc/coloc_guide_table.csv"))
 # mashR results
 mashr.results_Interval <- read.table(paste0(path_lustre, "output_data/interval_comp/pops_alltps_intervalFRA_mashr_results_sharing_filtered_leads.txt"), sep="\t") %>%
   mutate(shared = factor(shared, levels = c("Bigger effect in POPS2", "Only significant in POPS2", "Bigger effect in Interval", "Opposite direction of effect", "shared", "not significant")))
@@ -153,11 +152,11 @@ coloc.results_crossdataset <-  coloc.results %>%
   left_join(id_name %>% rename("eGene_name" = "gtf.gene_name"), by = c("eGene_id" = "gtf.gene_id"))
 
 # write this out 
-saveRDS(coloc.results_crossdataset, paste0(path_lustre, "output_data/flanders_4_coloc_outputs/coloc_results_crossdataset_all.rds"))
+saveRDS(coloc.results_crossdataset, paste0(path_lustre, "output_data/flanders_5_coloc_outputs/coloc_results_crossdataset_all_noHG.rds"))
 # save all coloc results for paper (only POPs2 and INTERVAL)
 write.table(coloc.results_crossdataset %>%
               filter(eQTL_dataset == "Interval_full_eQTL" | eQTL_dataset == "POPs2_bulk_all"), 
-            paste0(path_lustre, "output_data/flanders_4_coloc_outputs/coloc_results_crossdataset_paper.txt"), 
+            paste0(path_lustre, "output_data/flanders_5_coloc_outputs/coloc_results_crossdataset_paper.txt"), 
             quote = FALSE, row.names = FALSE)
 
 # subset to significant colocalizations across datasets
@@ -165,7 +164,7 @@ sig.coloc.results_crossdataset <- coloc.results_crossdataset %>%
   filter(PP.H4.abf > 0.8) 
 
 saveRDS(sig.coloc.results_crossdataset, 
-        paste0(path_lustre, "output_data/flanders_4_coloc_outputs/coloc_results_crossdataset_sig.rds"))
+        paste0(path_lustre, "output_data/flanders_5_coloc_outputs/coloc_results_crossdataset_sig_flanders_5.rds"))
 
 # How many GWAS were tested for coloc with POPs2? 
 coloc.results_crossdataset %>% dplyr::filter(
@@ -331,7 +330,7 @@ base_coloc_sup_table <- base_coloc_sup_table %>%
   # re-arrange
   relocate(POPS2_28wk, .after = POPS2_20wk)
 
-base_coloc_sup_table %>% write.table(paste0(path_lustre, "output_data/flanders_4_coloc_outputs/coloc_summary_table.csv"), 
+base_coloc_sup_table %>% write.table(paste0(path_lustre, "output_data/flanders_5_coloc_outputs/coloc_summary_table.csv"), 
                                      quote = FALSE, row.names = FALSE) 
 
 # thesis sup 
@@ -356,7 +355,7 @@ paper_sup <- base_coloc_sup_table %>%
   rename("reason_not_coloc" = "Interval_coloc_info", "significance_paper" = "significant_coloc") 
 
 # save this 
-paper_sup %>% write.csv(paste0(path_lustre, "output_data/flanders_4_coloc_outputs/coloc_summary_table_paper_sup.csv"), 
+paper_sup %>% write.csv(paste0(path_lustre, "output_data/flanders_5_coloc_outputs/coloc_summary_table_paper_sup.csv"), 
                         row.names = FALSE, na = "") 
 
 ########################### Plot ###########################
