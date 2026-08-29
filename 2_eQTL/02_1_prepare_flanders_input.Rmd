@@ -1,0 +1,653 @@
+---
+title: "02_1_prepare_flanders_input"
+output: html_document
+date: "2026-08-28"
+---
+
+02_1_prepare_flanders_inputs.R 
+
+################################################################################
+
+2.1. Prepare Flanders input file
+
+################################################################################
+
+Aim: Prepare the flanders input table and format files for flanders input 
+
+```{r}
+library(tidyverse)
+library(data.table)
+# Set out path 
+pops_lustre_path <- "genotyping/analysis/eQTL/"
+outpath <- paste0(pops_lustre_path, "input_data/flanders/")
+interval_path <- "interval_rna/"
+```
+
+We will fine-map and colocalize the following summary stats
+# eQTL
+1. POPs2 main effect eQTL 
+2. Interval main effect eQTL from full cohort (to determine whether the colocs with pregnancy traits could have been identified in any healthy cohort)
+# GWAS
+3. GDM GWAS
+4. Pre-eclampsia GWAS (FinnGen)
+5. Pre-eclampsia GWAS (Meta analysis)
+6. sPTB GWAS
+7. Gestational duration GWAS
+
+# 0. Make input parameters for flanders
+```{r}
+# make the input parameters file for Flanders
+columns.needed <- c("input", # Path and file name of the GWAS summary statistics file to fine-map.
+                    "study_id", # Identifier for the GWAS summary statistics file; used to identify results coming from the same GWAS.       
+                    "chr_lab", #  Name of the chromosome column in the GWAS summary statistics.  ## NOTE: X chr must be coded as 23
+                    "pos_lab", # Name of the genomic position column in the GWAS summary statistics.     
+                    "rsid_lab", # Name of the rsID or other SNP identifier column.      
+                    "a1_lab", # Name of the effect allele column.  
+                    "a0_lab", # Name of the non-effect allele column.          
+                    "freq_lab", # Name of the effect allele frequency column. If not available, set to NA and it will be calculated from the PLINK bfiles.
+                    "n_lab", # Name of the sample size column. If not available, set to NA and it will be approximated using MAF and SE.     
+                    "effect_lab", # Name of the effect size column (e.g., beta or odds ratio).        
+                    "se_lab", # Name of the effect standard error column.                                  
+                    "pvalue_lab", #  Name of the p-value column; can be nominal or log10-transformed.     
+                    "type", # Trait type: 'quant' for quantitative traits or 'cc' for case–control traits.       
+                    "sdY", # For quantitative traits: population standard deviation of the trait (1 if standardised). If NA, will be approximated. NA for binary traits.
+                    "s", # For binary traits: proportion of samples that are cases. NA for quantitative traits.   
+                    "grch", # Genome build of the GWAS summary statistics (37 or 38).                              
+                    "p_thresh1", # Nominal p-value threshold to retain significant association regions (suggested: 5e-08).      
+                    "p_thresh2", # Nominal p-value threshold to define borders of association regions (suggested: 1e-05).      
+                    "hole", # Minimum base-pair distance to separate independent loci (suggested: 250000).                          
+                    "bfile", # Path and file name prefix to PLINK binary files (.bed/.bim/.fam) used for LD computation.     
+                    "maf", # Minor allele frequency threshold; variants below this value are excluded.   
+                    "is_molQTL", # Boolean flag indicating whether the trait is molecular QTL (e.g., eQTL, pQTL).            
+                    "key", # When is_molQTL=TRUE, column identifying the traits (e.g., genes, proteins). Set to NA if FALSE.   
+                    "cs_thresh", # Posterior inclusion probability (PIP) threshold for defining credible sets (e.g., 0.99).   
+                    "grch_bfile", #  Genome build of LD reference PLINK files (should match grch if no liftover is used).   
+                    "process_bfile", # Flag to indicate whether the LD reference PLINK files need to be lifted over and/or processed by the pipeline. Set to FALSE to reuse pre-processed files (optional)
+                    "per_gene_p1", # Added by HGI: .tsv or .csv file of per-gene pvalue thresholds (i.e. from eigenMT)
+                    "per_gene_p2" # Added by HGI: .tsv or .csv file of per-gene pvalue thresholds (i.e. from eigenMT)
+                    )
+
+input.info <- matrix(NA, ncol=28, nrow=7, dimnames = list(seq(1, 7), columns.needed))
+
+```
+
+# 1. POPs2 main effect eQTL 
+Make input row
+```{r}
+# make row for input table 
+input.info[1,"input"] <- paste0(outpath, "POPS2_main_effect_input/POPS2_flanders_main_effects.txt")
+input.info[1,"sdY"] <- paste0(outpath, "POPS2_main_effect_input/POPS2_gene_sdY.txt")
+input.info[1,"per_gene_p1"] <- paste0(outpath, "POPS2_main_effect_input/eqtl_pval_thresh1_per_gene.tsv")
+input.info[1,"per_gene_p2"] <- paste0(outpath, "POPS2_main_effect_input/eqtl_pval_thresh2_per_gene.tsv")
+input.info[1, "rsid_lab"] <- "snps" # rsID or SNP identifier column name | String | Mandatory
+input.info[1, "freq_lab"] <- "MAF" # Effect allele frequency column name | String or NA | Optional
+input.info[1, "effect_lab"] <- "beta" # Effect size column (e.g., beta or OR) | String | Mandatory
+input.info[1, "se_lab"] <- "se" # Standard error column | String | Mandatory
+input.info[1, "pvalue_lab"] <- "pvalue" # P-value column (nominal or log10) | String | Mandatory
+input.info[1, "key"] <- 	"gene" # Column identifying traits (e.g., gene ID) if is_molQTL=TRUE  | String or NA  | Conditional
+input.info[1, "type"] <- "quant" # Trait type: 'quant' or 'cc' | quantitative trait (eQTL) or case control (GWAWS) | Mandatory 
+input.info[1, "is_molQTL"] <- 	TRUE
+input.info[1, "grch"] <- 38 # Genome build (37 or 38) | Integer | Mandatory
+input.info[1, "hole"] <- 	200000 # Min distance to separate loci (e.g., 250000) | Integer | Mandatory # what is sensible
+input.info[1, "maf"] <- 	0.01 # Minor allele frequency threshold | Numeric (0–1) | Mandatory
+input.info[1, "cs_thresh"] <- 	0.95 #  PIP threshold for credible sets (e.g., 0.99) | Numeric (0–1) | Mandatory # reduce to see if get fewer empty
+input.info[1, "grch_bfile"] <- 38 #  Genome build of reference PLINK files (should match grch) | Integer (37 or 38) | Mandatory
+input.info[1, "bfile"] <- "genotyping/data/imputed_genotyping_dataset_for_eQTL/POPS2_genotyping_imputed_eQTL_rsid" #  Genome build of reference PLINK files (should match grch) | Integer (37 or 38) | Mandatory # For Sanger users - this is from POPs2 dir
+input.info[1, "chr_lab"] <- "chr" # Chromosome column name in GWAS | String | Mandatory
+input.info[1, "pos_lab"] <- "SNPpos" # Genomic position column name in GWAS | String | Mandatory
+input.info[1, "a1_lab"] <- "A1" # Effect allele column name | String | Mandatory
+input.info[1, "a0_lab"] <- "A2" # Non-effect allele column name | String | Mandatory
+input.info[1, "n_lab"] <- "nsamples" # Sample size column name | String or NA | Optional
+input.info[1, "study_id"] <- "POPs2_bulk_all" # Identifier for the GWAS study | String | Mandatory
+input.info[1,"p_thresh1"] <- 1.00E-05 # nominal p-value threshold to retain significant association regions (suggested: 5e-08). | Numeric | Mandatory - I won't be using this anyway 
+input.info[1,"p_thresh2"] <- 1.00E-04 # nominal p-value threshold to define borders of association regions (suggested: 1e-05). | Numeric | Mandatory - I won't be using this anyway 
+input.info[1, "process_bfile"] <- TRUE
+```
+
+Make input files
+```{r}
+# main effects
+main_effects_pops <- readRDS(paste0(pops_lustre_path, "output_data/main_effects/ciseqtl_all.rds"))
+# read in p-value thresholds per gene 
+pval_thresholds_pops <- read.delim(paste0(pops_lustre_path, "output_data/eigenMT/nominal_pval_thresholds.txt"))
+# maf df
+maf_df_pops <- read.table(paste0(pops_lustre_path, "input_data/eQTL_maf.frq"), header = TRUE)
+# eQTL count matrix 
+gene_exp_pops <- readRDS(paste0(pops_lustre_path, "input_data/eQTL_counts.rds"))
+
+# make input files for flanders 
+##### Results ##### 
+# update the results df to contain the columns needed for flanders
+flanders_input <- main_effects_pops %>% left_join(maf_df_pops %>% 
+                                                      # update the maf_df to have the correct format for the non-rsid snps
+                                               mutate(SNP = ifelse(!grepl("rs", SNP), gsub(":", ".", SNP), SNP),
+                                                      # calculate n samples 
+                                                      nsamples = NCHROBS/2) %>%
+                                               select(-NCHROBS, -CHR), 
+                                             by = c("snps" = "SNP"))
+# write out updated results file and put path in flanders input file
+head(flanders_input)
+dim(flanders_input)
+write.table(flanders_input, input.info[1,"input"], sep="\t", quote=F, row.names=F)
+read.table(input.info[1,"input"], nrows = 3, header = TRUE)
+
+##### sdY ##### 
+# get genes where eQTL were mapped because count matrix is subsetted by samples not genes
+eQTL_genes_POPS2 <- unique(main_effects_pops$gene)
+# calculate sd for each gene 
+gene_sd_pops <- apply(gene_exp_pops, 1, sd)
+# Make a data frame with gene IDs and SDs
+gene_sd_df_pops <- data.frame(
+  phenotype_id = names(gene_sd_pops),
+  sdY = gene_sd_pops
+) %>%
+  filter(phenotype_id %in% eQTL_genes_POPS2)
+# write out all sds in the correct format: TSV table with columns phenotype_id and sdY
+gene_sd_df_pops %>% write.table(input.info[1,"sdY"], sep = "\t", quote = FALSE, row.names = FALSE)
+read.table(input.info[1,"sdY"], nrows = 3, header = TRUE)
+
+##### per-gene pval thresholds ##### 
+
+# p-threhs1 come directly from eigenMT
+pval_thresholds_pops %>% 
+  select(-n.tests) %>%
+  rename("gene" = "phenotype_id",
+         "threshold" = "pval_thresh") %>%
+  write.table(input.info[1,"per_gene_p1"], sep = "\t", quote = FALSE, row.names = FALSE)
+read.table(input.info[1,"per_gene_p1"], nrows = 3, header = TRUE)
+# p-thresh2 will come from p-thresh1 with caps
+# if p1 < 1e-4:
+#     p2 = min(10 * p1, 1e-4)
+# elif p1 < 1e-3:
+#     p2 = min(10 * p1, 1e-3)
+# else:
+#     p2 = min(5 * p1, 1e-2)
+# For each gene, the variant inclusion threshold (p-thresh2) for Flanders fine-mapping was scaled from the gene-specific significance threshold (p-thresh1) estimated by eigenMT, reflecting the effective number of independent tests. We used a piecewise scaling with an upper cap: p-thresh2 = min(10 × p1, 1×10⁻⁴) for p1 < 1×10⁻⁴, p-thresh2 = min(10 × p1, 1×10⁻³) for 1×10⁻⁴ ≤ p1 < 1×10⁻³, and p-thresh2 = min(5 × p1, 1×10⁻²) for p1 ≥ 1×10⁻³. This approach allows inclusion of variants in LD with lead eQTLs while controlling region size, preserving stable fine-mapping performance.
+pval_thresholds_pops %>% 
+  mutate(p_thresh2 = ifelse(threshold < 1e-4, pmin(10*threshold, 1e-4), 
+                            ifelse(threshold < 1e-3, pmin(10*threshold, 1e-3),
+                                   pmin(5*threshold, 1e-2)))) %>%
+    select(-n.tests, -threshold) %>%
+  rename("gene" = "phenotype_id",
+         "p_thresh2" = "pval_thresh") %>%
+  write.table(input.info[1,"per_gene_p2"], sep = "\t", quote = FALSE, row.names = FALSE)
+read.table(input.info[1,"per_gene_p2"], nrows = 3, header = TRUE)
+```
+
+# 2. Interval main effect eQTL from full cohort 
+Include INTERVAL full cohort main effects in colocalization in order to determine whether the colocs with pregnancy traits could have been identified in any healthy cohort (with sufficient power)
+Original publication: https://www.nature.com/articles/s41588-025-02096-3
+
+Get list of genotyping sample IDs that had matched RNA-seq samples and were included in eQTL mapping 
+```{r}
+interval_metadata <- read.csv(paste0(interval_path, "recovery_intermediate_files/INTERVAL_RNAseq/expression_data/processed/INTERVAL_RNA_batch1-15_MasterCovariates_FilteredSamplesGenes_swapsSwappedMismatchRemoved.csv"))
+dim(interval_metadata)  # 4732    1 # This matches the n samples in the publication 
+# write out list of all genotyping IDs for this group of samples 
+interval_metadata %>% mutate(fid = 0) %>%
+  select(fid, affymetrix_ID) %>%
+  write.table(paste0(interval_path, "POPS2_comparison/flanders_input/eQTL_genotyping_IDs.txt"), quote = FALSE, col.names = FALSE, row.names = FALSE, sep = "\t")
+```
+
+First, calculate frq on the genotyping data filtered to samples used for eQTL mapping  
+```{bash}
+cd interval_rna/POPS2_comparison/flanders_input
+fash 20 
+# load module with plink
+module load HGI/softpack/groups/trynka/popgen/1.0
+# calculate frq on the all autosomes file in only samples with RNA
+plink \
+  --bfile interval_rna/recovery_intermediate_files/INTERVAL_RNAseq/genotype/INTERVAL_RNAseq_Phase1-3_imputed_b38_biallelic_MAF0.005_AllAutosomes \
+  --keep eQTL_genotyping_IDs.txt \
+  --freq \
+  --out INTERVAL_RNAseq_Phase1-3_imputed_b38_biallelic_MAF0.005_AllAutosomes_maf
+  
+```
+
+Make input row
+```{r}
+input.info[2,"input"] <- paste0(interval_path, "POPS2_comparison/flanders_input/Interval_sumstats_forFlanders_sigEGenes.txt")
+input.info[2,"per_gene_p1"] <- paste0(interval_path, "POPS2_comparison/flanders_input/interval_eqtl_pval_thresh1_per_gene_sigOnly.tsv")
+input.info[2,"per_gene_p2"] <- paste0(interval_path, "POPS2_comparison/flanders_input/interval_eqtl_pval_thresh2_per_gene_sigOnly.tsv")
+input.info[2, "rsid_lab"] <- "variant_id" # rsID or SNP identifier column name | String | Mandatory
+input.info[2, "freq_lab"] <- "af_update" # Effect allele frequency column name | String or NA | Optional
+input.info[2, "effect_lab"] <- "slope" # Effect size column (e.g., beta or OR) | String | Mandatory
+input.info[2, "se_lab"] <- "slope_se" # Standard error column | String | Mandatory
+input.info[2, "pvalue_lab"] <- "pval_nominal" # P-value column (nominal or log10) | String | Mandatory
+input.info[2, "key"] <- 	"phenotype_id" # Column identifying traits (e.g., gene ID) if is_molQTL=TRUE  | String or NA  | Conditional
+input.info[2, "type"] <- "quant" # Trait type: 'quant' or 'cc' | quantitative trait (eQTL) or case control (GWAWS) | Mandatory 
+input.info[2, "is_molQTL"] <- 	TRUE
+input.info[2, "grch"] <- 38 # Genome build (37 or 38) | Integer | Mandatory # From Interval eQTL paper: Reads were aligned to the GRCh38 human reference genome
+input.info[2, "hole"] <- 	200000 # Min distance to separate loci (e.g., 250000) | Integer | Mandatory # what is sensible
+input.info[2, "maf"] <- 	0.005 # Minor allele frequency threshold | Numeric (0–1) | Mandatory # From Interval methods: Before analysis, the dataset was restricted to individuals with RNA-seq and filtered to remove genetic variants with HWE exact test P<1e−6, genotype missingness >0.05 or minor allele frequency<0.5%.
+input.info[2, "cs_thresh"] <- 	0.95 #  PIP threshold for credible sets (e.g., 0.99) | Numeric (0–1) | Mandatory # reduce to see if get fewer empty
+input.info[2, "grch_bfile"] <- 38 #  Genome build of reference PLINK files (should match grch) | Integer (37 or 38) | Mandatory
+input.info[2, "bfile"] <- "/path/to/dir/interval_rna/recovery_intermediate_files/INTERVAL_RNAseq/genotype/INTERVAL_RNAseq_Phase1-3_imputed_b38_biallelic_MAF0.005_AllAutosomes" #  Genome build of reference PLINK files (should match grch) | Integer (37 or 38) | Mandatory # Since Interval main effects are only on autosomes, will use only autosome ref from interval 
+input.info[2, "chr_lab"] <- "chr" # Chromosome column name in GWAS | String | Mandatory
+input.info[2, "pos_lab"] <- "pos_b38" # Genomic position column name in GWAS | String | Mandatory
+input.info[2, "a1_lab"] <- "effect_allele" # Effect allele column name | String | Mandatory 
+input.info[2, "a0_lab"] <- "other_allele" # Non-effect allele column name | String | Mandatory 
+input.info[2, "n_lab"] <- "nsamples" # Sample size column name | String or NA | Optional
+input.info[2, "study_id"] <- "Interval_full_eQTL" # Identifier for the GWAS study | String | Mandatory
+input.info[2,"p_thresh1"] <- 1.00E-05 # nominal p-value threshold to retain significant association regions (suggested: 5e-08). | Numeric | Mandatory 
+input.info[2,"p_thresh2"] <- 1.00E-04 # nominal p-value threshold to define borders of association regions (suggested: 1e-05). | Numeric | Mandatory 
+input.info[2,"sdY"] <- 1 # For quantitative traits: population standard deviation of the trait (1 if standardised). If NA, will be approximated. NA for binary traits. | Numeric or NA | Mandatory # from Interval paper methods: Next, for each gene, the normalized log2-FPKM values across samples were transformed via the ranked-based inverse normal transformation function ‘rntransform’ implemented in the R package GenABEL (v1.8-0)59. Inverse normal transformation was applied to ensure the expression values followed a normal distribution.
+input.info[2, "process_bfile"] <- TRUE
+```
+
+
+Then, make input files 
+```{r}
+# interval main effects are divided by chr
+# first, list all of the results files 
+interval_eQTL_res_files <- list.files(paste0(interval_path, "recovery_intermediate_files/INTERVAL_RNAseq/results_summary_stats/INTERVAL_eQTL_summary_statistics/"), 
+                                      pattern = "INTERVAL_eQTL_nominal_chr*", 
+                                      full.names = TRUE)
+# read in the frq file
+interval_frq <- fread(paste0(interval_path, "POPS2_comparison/flanders_input/INTERVAL_RNAseq_Phase1-3_imputed_b38_biallelic_MAF0.005_AllAutosomes_maf.frq"), header = TRUE)
+# read in interval pval thresholds 
+Interval_pval_thresholds <- read.delim(paste0(interval_path, "recovery_intermediate_files/INTERVAL_RNAseq/results_summary_stats/INTERVAL_eQTL_summary_statistics/INTERVAL_eQTL_phenotype_summary.tsv"), header = TRUE)
+
+# make input files for flanders 
+##### Results ##### 
+# next read in all per-chr summary stats files 
+interval_eQTL_list <- lapply(interval_eQTL_res_files, function(f) {
+  fread(f, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+})
+# combine them into one df
+Interval_full_eQTL <- do.call(rbind, interval_eQTL_list)
+# remove empty columns
+Interval_full_eQTL <- Interval_full_eQTL %>% select(-V14, -V16)
+# remove one row that looks like it must've been an error... slope_se == NA
+Interval_full_eQTL <- Interval_full_eQTL %>% filter(!is.na(slope_se))
+# join to maf calculated only in the data subset with RNA-seq samples 
+# Add nsamples = 4732 to all rows as tensorQTL imputes genotypes 
+Interval_full_eQTL <- Interval_full_eQTL %>% 
+  # join to freq info 
+  left_join(interval_frq, by = c("chr" = "CHR", "variant_id" = "SNP")) %>%
+  # update AF based on the subsetted genotyping dataset
+  mutate(af_update = ifelse(`A1` == `effect_allele`, MAF, 1-MAF),
+         nsamples = 4732)
+# remove eQTL results for genes that were determined not to be significant by tensorQTL
+sig_eGenes <- Interval_pval_thresholds %>% filter(qval_sig == TRUE) %>% pull(phenotype_id) %>% unique()
+Interval_sig_eQTL <- Interval_full_eQTL %>%
+  filter(phenotype_id %in% sig_eGenes)
+
+# write out updated results file and put path in flanders input file
+write.table(Interval_sig_eQTL, input.info[2,"input"], sep="\t", quote=F, row.names=F)
+read.table(input.info[2,"input"], nrows = 5, header = TRUE)
+
+##### per-gene pval thresholds ##### 
+
+# p-threhs1 come directly from tensorQTL output where pval_nominal_threshold is the threshold only for eGenes (qval_sig)
+# otherwise, I will substitute a blanket pval threshold of 1e-5 (where the other option is to subset the input to only sig eQTL)
+Interval_pval_thresholds %>% 
+  filter(qval_sig == TRUE) %>% 
+  rename("pval_nominal_threshold" = "pval_thresh") %>% 
+  select(phenotype_id, pval_thresh) %>%
+  write.table(input.info[2,"per_gene_p1"], sep = "\t", quote = FALSE, row.names = FALSE)
+read.table(input.info[2,"per_gene_p1"], nrows = 3, header = TRUE)
+# p-thresh2 will come from p-thresh1 with caps
+# if p1 < 1e-4:
+#     p2 = min(10 * p1, 1e-4)
+# elif p1 < 1e-3:
+#     p2 = min(10 * p1, 1e-3)
+# else:
+#     p2 = min(5 * p1, 1e-2)
+# For each gene, the variant inclusion threshold (p-thresh2) for Flanders fine-mapping was scaled from the gene-specific significance threshold (p-thresh1) estimated by eigenMT, reflecting the effective number of independent tests. We used a piecewise scaling with an upper cap: p-thresh2 = min(10 × p1, 1×10⁻⁴) for p1 < 1×10⁻⁴, p-thresh2 = min(10 × p1, 1×10⁻³) for 1×10⁻⁴ ≤ p1 < 1×10⁻³, and p-thresh2 = min(5 × p1, 1×10⁻²) for p1 ≥ 1×10⁻³. This approach allows inclusion of variants in LD with lead eQTLs while controlling region size, preserving stable fine-mapping performance.
+Interval_pval_thresholds %>% 
+  filter(qval_sig == TRUE) %>% 
+  rename("pval_nominal_threshold" = "pval_thresh") %>% 
+  select(phenotype_id, pval_thresh) %>%
+  mutate(p_thresh2 = ifelse(pval_thresh < 1e-4, pmin(10*pval_thresh, 1e-4), 
+                            ifelse(pval_thresh < 1e-3, pmin(10*pval_thresh, 1e-3),
+                                   pmin(5*pval_thresh, 1e-2)))) %>%
+     select(phenotype_id, p_thresh2) %>%
+  rename("p_thresh2" = "pval_thresh") %>%
+  write.table(input.info[2,"per_gene_p2"], sep = "\t", quote = FALSE, row.names = FALSE)
+read.table(input.info[2,"per_gene_p2"], nrows = 3, header = TRUE)
+```
+
+# 3. GDM GWAS
+GDM GWAS EUR meta analysis from this preprint https://www.medrxiv.org/content/10.1101/2025.08.19.25333735v1.full (as recommended by Carolina)
+
+Make input row
+```{r}
+# set parameters
+input.info[3,"input"] <- paste0(pops_lustre_path, "input_data/GWAS_summary_stats_for_coloc/European_GDM_maternal.txt")
+input.info[3, "rsid_lab"] <- "SNP" # rsID or SNP identifier column name | String | Mandatory
+input.info[3, "freq_lab"] <- "FREQ" # Effect allele frequency column name | String or NA | Optional
+input.info[3, "effect_lab"] <- "BETA" # Effect size column (e.g., beta or OR) | String | Mandatory
+input.info[3, "se_lab"] <- "SE" # Standard error column | String | Mandatory
+input.info[3, "pvalue_lab"] <- "PVAL" # P-value column (nominal or log10) | String | Mandatory
+input.info[3, "key"] <- 	NA # Column identifying traits (e.g., gene ID) if is_molQTL=TRUE  | String or NA  | Conditional
+input.info[3, "type"] <- "cc" # Trait type: 'quant' or 'cc' | quantitative trait (eQTL) or case control (GWAWS) | Mandatory 
+input.info[3, "is_molQTL"] <- 	FALSE # | TRUE if molecular QTL (eQTL, pQTL); else FALSE | TRUE/FALSE | Mandatory
+input.info[3, "grch"] <- 38 # Genome build (37 or 38) | Integer | Mandatory (from paper: If required, genetic data were transformed to align with the NCBI's Genome Reference Consortium human build 38 (GRCh38))
+input.info[3, "p_thresh1"] <- 1e-05 #5e-08	#1.00E-05 # # nominal p-value threshold to retain significant association regions (suggested: 5e-08). | Numeric | Mandatory # genome-wide significance threhsold 
+input.info[3, "p_thresh2"] <- 1e-04 # 1e-05 # 1.00E-04 # Nominal p-value threshold to define borders of association regions (suggested: 1e-05). | Numeric | Mandatory # genome-wide suggestive significance threshold
+input.info[3, "hole"] <- 	200000 # Min distance to separate loci (e.g., 250000) | Integer | Mandatory # what is sensible
+input.info[3, "maf"] <- 	0.01 # Minor allele frequency threshold | Numeric (0–1) | Mandatory (from paper: After performing the multi-ancestry and ancestry-specific meta-analyses, we removed variants that were not present in at least half of the total meta-analysis sample size and variants with a MAF of less than 1%.)
+input.info[3, "cs_thresh"] <- 	0.95 #  PIP threshold for credible sets (e.g., 0.99) | Numeric (0–1) | Mandatory # reduce to see if get fewer empty
+input.info[3, "grch_bfile"] <- 38 #  Genome build of reference PLINK files (should match grch) | Integer (37 or 38) | Mandatory
+input.info[3, "bfile"] <- "/path/to/dir/genotyping/data/imputed_genotyping_dataset_for_eQTL/POPS2_genotyping_imputed_eQTL_rsid" #  Genome build of reference PLINK files (should match grch) | Integer (37 or 38) | Mandatory # Here I use the POPs2 genotyping dataset as an LD ref because it is a large, all female (X chr), majorly European cohort. X chr is coded as 23
+input.info[3, "chr_lab"] <- "CHR" # Chromosome column name in GWAS | String | Mandatory
+input.info[3, "pos_lab"] <- "BP" # Genomic position column name in GWAS | String | Mandatory
+input.info[3, "a1_lab"] <- "A1" # Effect allele column name | String | Mandatory
+input.info[3, "a0_lab"] <- "A2" # Non-effect allele column name | String | Mandatory
+input.info[3, "n_lab"] <- "N" # Sample size column name | String or NA | Optional
+input.info[3, "study_id"] <- "GDM_GWAS_EUR_meta" # Identifier for the GWAS study | String | Mandatory
+input.info[3, "s"] <- 29640/(766250) # s | Proportion of cases (cc only) | Numeric (0–1) or NA | Mandatory # summary statistics are provided for Europeans (EUR: FG n = 17,810; 1hG n = 7,736; 2hG n = 10,784; HbA1c n = 5,377; GDM n = 766,250 [29,640 cases])
+input.info[3, "process_bfile"] <- TRUE
+input.info[3,"per_gene_p1"] <- ""#blank_pthresh1_filepath
+input.info[3,"per_gene_p2"] <- ""#blank_pthresh2_filepath
+```
+
+Prepare input data 
+```{r}
+# read in gdm gwas
+# downloaded from here https://rdm.uq.edu.au/files/88162382-7abb-4c07-a5bf-b3514b976602
+gdm_gwas <- read.table(paste0(pops_lustre_path, "input_data/GWAS_summary_stats_for_coloc/776e0e38d862c1ce_GENDIP2-Q6147_Q6147/data/European_GDM_maternal"), header = TRUE)
+# Note: No data from the X chr in these summary stats - I will follow up with Lizzy to see if this is expected. 
+
+# write out the GWAS file as a tsv in the correct format 
+write.table(gdm_gwas %>%
+              mutate(A1 = toupper(A1),
+                     A2 = toupper(A2)), 
+            input.info[3,"input"], 
+            sep="\t", quote=F, row.names=F) # make sure CHR is coded as 23
+read.table(input.info[3,"input"], nrows = 3, header = TRUE)
+
+```
+
+# 4. Pre-eclampsia GWAS (FinnGen)
+Website: https://r6.risteys.finngen.fi/phenocode/O15_PRE_OR_ECLAMPSIA and https://r12.finngen.fi/pheno/O15_PRE_OR_ECLAMPSIA (there are discrepancies, but the finngen website matches the downloaded metadata finngen_R12_pheno_n.tsv, so I will go with that n. Omar suggested it could have to do with some filtering.)
+FinnGen summary stats already in humgen resources 
+
+This dataset does appear to have X chr in the sumstats
+
+```{bash}
+# cd to correct dir
+cd genotyping/analysis/eQTL/input_data/GWAS_summary_stats_for_coloc
+# unzip sumstats from humgen resources to pops dir 
+gunzip -c humgen/resources_v2/FinnGen/summary_stats/release/finngen_R12_O15_PREECLAMPS.gz > finngen_R12_O15_PREECLAMPS.txt
+# remove the # at the beginning of the header row 
+sed -i '1s/^#//' finngen_R12_O15_PREECLAMPS.txt
+# get finnish reference from 1kgp
+mkdir fin_ref
+cd fin_ref
+# get list of finnish samples (n = 105)
+grep FIN humgen/resources_v2/1000g/release/20190312/20190312_biallelic_SNV_and_INDEL/IGSR_1000_Genomes_GRCh38_Samples.tsv | awk '{ print $1, $1 }' > 1000KG_FIN.txt
+# load module
+module load HGI/softpack/groups/trynka/popgen/1.0
+# subset 1kgp
+plink --bfile humgen/resources_v2/1000g/release/20190312/20190312_biallelic_SNV_and_INDEL/ALL.snp.GRCh38.phased.plink \
+--set-missing-var-ids @_#_\$1_\$2 \
+--keep 1000KG_FIN.txt \
+--make-bed \
+--out 1000G_FIN 
+# get allele frequencies in this population 
+plink --bfile 1000G_FIN --freq --out 1000G_FIN
+```
+
+Make Flanders input row
+Info about summary stat columns here: https://finngen.gitbook.io/documentation/data-description
+```{r}
+# read in the head of the summary stats to understand columns
+read.delim(
+  paste0(pops_lustre_path, "input_data/GWAS_summary_stats_for_coloc/finngen_R12_O15_PREECLAMPS.txt"),
+  nrows = 5
+)
+
+# set parameters
+input.info[4,"input"] <- paste0(pops_lustre_path, "input_data/GWAS_summary_stats_for_coloc/finngen_R12_O15_PREECLAMPS.txt")
+input.info[4, "rsid_lab"] <- "rsids" # rsID or SNP identifier column name | String | Mandatory # rsids = variant identifier
+input.info[4, "freq_lab"] <- "af_alt" # Effect allele frequency column name | String or NA | Optional # af_alt = alternative (effect) allele frequency
+input.info[4, "effect_lab"] <- "beta" # Effect size column (e.g., beta or OR) | String | Mandatory # beta = effect size (log(OR) scale) estimated with regenie for the alternative allele
+input.info[4, "se_lab"] <- "sebeta" # Standard error column | String | Mandatory # sebeta = standard error of effect size estimated with regenie
+input.info[4, "pvalue_lab"] <- "pval" # P-value column (nominal or log10) | String | Mandatory # pval = p-value from regenie
+input.info[4, "key"] <- 	NA # Column identifying traits (e.g., gene ID) if is_molQTL=TRUE  | String or NA  | Conditional
+input.info[4, "type"] <- "cc" # Trait type: 'quant' or 'cc' | quantitative trait (eQTL) or case control (GWAWS) | Mandatory 
+input.info[4, "is_molQTL"] <- 	FALSE # | TRUE if molecular QTL (eQTL, pQTL); else FALSE | TRUE/FALSE | Mandatory
+input.info[4, "grch"] <- 38 # Genome build (37 or 38) | Integer | Mandatory (from paper: If required, genetic data were transformed to align with the NCBI's Genome Reference Consortium human build 38 (GRCh38)) # https://docs.finngen.fi/finngen-data-specifics/red-library-data-individual-level-data/genotype-data/human-genome-build-we-use-and-how-do-we-report-genotypes Human reference genome build GRCh38/hg38 is used for FinnGen genotype data
+input.info[4, "p_thresh1"] <- 1e-05 #5e-08	#1.00E-05 # # nominal p-value threshold to retain significant association regions (suggested: 5e-08). | Numeric | Mandatory # genome-wide significance threhsold 
+input.info[4, "p_thresh2"] <- 	1e-04 #1e-05 # 1.00E-04 # Nominal p-value threshold to define borders of association regions (suggested: 1e-05). | Numeric | Mandatory # genome-wide suggestive significance threshold
+input.info[4, "hole"] <- 	200000 # Min distance to separate loci (e.g., 250000) | Integer | Mandatory # what is sensible
+input.info[4, "maf"] <- 	3/(2*(9717+259181)) # Minor allele frequency threshold | Numeric (0–1) | Mandatory (from website: In sample-wise quality control steps, individuals with ambiguous gender, high genotype missingness (>5%), excess heterozygosity (+-4SD) and non-Finnish ancestry were excluded. In variant-wise quality control steps, variants with high missingness (>2%), low HWE P-value (<1e-6) and low minor allele count (MAC<3) were excluded.). I will therefore use 3/(2*n samples) or 3/(2*(n cases + n controls)) # 9717 cases, 259181 controls
+input.info[4, "cs_thresh"] <- 	0.95 #  PIP threshold for credible sets (e.g., 0.99) | Numeric (0–1) | Mandatory # reduce to see if get fewer empty
+input.info[4, "grch_bfile"] <- 38 #  Genome build of reference PLINK files (should match grch) | Integer (37 or 38) | Mandatory
+input.info[4, "bfile"] <- "/path/to/dir/genotyping/analysis/eQTL/input_data/GWAS_summary_stats_for_coloc/fin_ref/1000G_FIN" #  Genome build of reference PLINK files (should match grch) | Integer (37 or 38) | Mandatory 
+input.info[4, "chr_lab"] <- "chrom" # Chromosome column name in GWAS | String | Mandatory # #chrom = chromosome on build GRCh38 (1-23)
+input.info[4, "pos_lab"] <- "pos" # Genomic position column name in GWAS | String | Mandatory # pos = position in base pairs on build GRCh38
+input.info[4, "a1_lab"] <- "alt" # Effect allele column name | String | Mandatory # alt = alternative allele (effect allele)
+input.info[4, "a0_lab"] <- "ref" # Non-effect allele column name | String | Mandatory # ref = reference allele
+input.info[4, "n_lab"] <- NA # Sample size column name | String or NA | Optional
+input.info[4, "study_id"] <- "PE_FINNGEN_GWAS" # Identifier for the GWAS study | String | Mandatory
+input.info[4, "s"] <- 9717/(9717+259181) # s | Proportion of cases (cc only) | Numeric (0–1) or NA | Mandatory # 9717 cases 259181 controls
+input.info[4, "process_bfile"] <- TRUE
+input.info[4,"per_gene_p1"] <- ""
+input.info[4,"per_gene_p2"] <- ""
+```
+
+# 5. Pre-eclampsia GWAS (Meta analysis)
+
+From Lizzy: pre-eclampsia Honigberg et al. 2023 (doi: 10.1038/s41591-023-02374-9) would actually be better-powered than the FinnGen one I shared before (we hadn't included it since it includes ALSPAC and MoBa).
+Paper: https://www.nature.com/articles/s41591-023-02374-9#data-availability
+Data download: https://figshare.com/articles/dataset/Polygenic_prediction_of_preeclampsia_and_gestational_hypertension/22680904/1
+
+Make the input table
+```{r}
+read.table(paste0(pops_lustre_path, "input_data/GWAS_summary_stats_for_coloc/metal_preeclampsia_discovery_multiancestry_metaanalysis_formatted.txt"), nrows = 5, header = TRUE)
+
+# set parameters
+input.info[5,"input"] <- paste0(pops_lustre_path, "input_data/GWAS_summary_stats_for_coloc/metal_preeclampsia_discovery_multiancestry_metaanalysis_formatted.txt")
+input.info[5, "rsid_lab"] <- "MarkerName" # rsID or SNP identifier column name | String | Mandatory # - this is the marker name
+input.info[5, "freq_lab"] <- "Freq1" # Effect allele frequency column name | String or NA | Optional # - weighted average of frequency for allele 1 across all studies
+input.info[5, "effect_lab"] <- "Effect" # Effect size column (e.g., beta or OR) | String | Mandatory # - overall estimated effect size for allele1
+input.info[5, "se_lab"] <- "StdErr" # Standard error column | String | Mandatory # - overall standard error for effect size estimate
+input.info[5, "pvalue_lab"] <- "P.value" # P-value column (nominal or log10) | String | Mandatory # - meta-analysis p-value
+input.info[5, "key"] <- 	NA # Column identifying traits (e.g., gene ID) if is_molQTL=TRUE  | String or NA  | Conditional
+input.info[5, "type"] <- "cc" # Trait type: 'quant' or 'cc' | quantitative trait (eQTL) or case control (GWAWS) | Mandatory 
+input.info[5, "is_molQTL"] <- 	FALSE # | TRUE if molecular QTL (eQTL, pQTL); else FALSE | TRUE/FALSE | Mandatory
+input.info[5, "grch"] <- 38 # Genome build (37 or 38) | Integer | Mandatory # Summary files provide information on chromosome, genomic position (NCBI build 37) # from paper: Variants from GWAS summary statistics were matched by genome build 38 position and alleles. GWAS summary statistics that were in genome build 37 were lifted to genome build 38 using UCSC liftOver
+input.info[5, "p_thresh1"] <- 1e-05 #5e-08	#1.00E-05 # # nominal p-value threshold to retain significant association regions (suggested: 5e-08). | Numeric | Mandatory # genome-wide significance threhsold 
+input.info[5, "p_thresh2"] <- 	1e-04 #1e-05 # 1.00E-04 # Nominal p-value threshold to define borders of association regions (suggested: 1e-05). | Numeric | Mandatory # genome-wide suggestive significance threshold
+input.info[5, "hole"] <- 	200000 # Min distance to separate loci (e.g., 250000) | Integer | Mandatory # what is sensible
+input.info[5, "maf"] <- 	0.01 # Minor allele frequency threshold | Numeric (0–1) | Mandatory # from paper: We tested the association of common variants (minor allele frequency (MAF) ≥1%)
+input.info[5, "cs_thresh"] <- 	0.95 #  PIP threshold for credible sets (e.g., 0.99) | Numeric (0–1) | Mandatory # reduce to see if get fewer empty
+input.info[5, "grch_bfile"] <- 38 #37 #  Genome build of reference PLINK files (should match grch) | Integer (37 or 38) | Mandatory
+input.info[5, "bfile"] <- "/path/to/dir/genotyping/data/imputed_genotyping_dataset_for_eQTL/POPS2_genotyping_imputed_eQTL_rsid" #  Genome build of reference PLINK files (should match grch) | Integer (37 or 38) | Mandatory # Here I use the POPs2 genotyping dataset as an LD ref because it is a large, all female (X chr), majorly European cohort. X chr is coded as 23
+input.info[5, "chr_lab"] <- "Chromosome" # Chromosome column name in GWAS | String | Mandatory
+input.info[5, "pos_lab"] <- "Position" # Genomic position column name in GWAS | String | Mandatory
+input.info[5, "a1_lab"] <- "Allele1" # Effect allele column name | String | Mandatory # - the first allele for this marker in the first file where it occurs
+input.info[5, "a0_lab"] <- "Allele2" # Non-effect allele column name | String | Mandatory  # - the second allele for this marker in the first file where it occurs
+input.info[5, "n_lab"] <- "NA" # Sample size column name | String or NA | Optional
+input.info[5, "study_id"] <- "PE_GWAS_multiancestry_meta" # Identifier for the GWAS study | String | Mandatory
+input.info[5, "s"] <- 20064/(20064+703117) # s | Proportion of cases (cc only) | Numeric (0–1) or NA | Mandatory # preeclampsia/eclampsia in 20,064 cases and 703,117 controls
+input.info[5, "process_bfile"] <- TRUE
+input.info[5,"per_gene_p1"] <- ""
+input.info[5,"per_gene_p2"] <- ""
+```
+
+Format the sumstats (Alleles need to be uppercase)
+```{r}
+pe_multi_gwas <- read.table(paste0(pops_lustre_path, "input_data/GWAS_summary_stats_for_coloc/metal_preeclampsia_discovery_multiancestry_metaanalysis.txt"), 
+                            header = TRUE, 
+                            fill = TRUE)
+pe_multi_gwas_formatted <- pe_multi_gwas %>%
+              # remove NA values
+              filter(if_all(everything(), ~ !is.na(.))) %>%
+              # make the allele values uppercase 
+              mutate(Allele1 = toupper(Allele1),
+                     Allele2 = toupper(Allele2), 
+                     # for the one row where chr == X, make chr = 23
+                     Chromosome = ifelse(Chromosome == "X", 23, Chromosome))
+
+# write out the GWAS file as a tsv in the correct format 
+write.table(pe_multi_gwas_formatted, 
+            input.info[5,"input"], 
+            sep="\t", quote=F, row.names=F) # make sure CHR is coded as 23
+read.table(input.info[5,"input"], nrows = 3, header = TRUE)
+```
+
+
+
+# 6. sPTB GWAS
+Paper: https://pmc.ncbi.nlm.nih.gov/articles/PMC10101852/
+Sumstat download: https://egg-consortium.org/Gestational-duration-2023.html (EGG_Maternal_GWAMA_allPTD.txt.gz. Maternal GWAS meta-analysis of preterm delivery in 233,290 women (n cases = 15,419). Data from 23andMe is not included in the meta-analysis.)
+Downloaded to farm `genotyping/analysis/eQTL/input_data/GWAS_summary_stats_for_coloc/EGG_Maternal_GWAMA_allPTD.tx`
+
+This dataset does appear to have X chr in the sumstats
+
+Make the input table
+```{r}
+# set parameters
+input.info[6,"input"] <- paste0(pops_lustre_path, "input_data/GWAS_summary_stats_for_coloc/EGG_Maternal_GWAMA_allPTD_formatted.txt")
+input.info[6, "rsid_lab"] <- "RSID" # rsID or SNP identifier column name | String | Mandatory
+input.info[6, "freq_lab"] <- "EAF" # Effect allele frequency column name | String or NA | Optional
+input.info[6, "effect_lab"] <- "BETA" # Effect size column (e.g., beta or OR) | String | Mandatory
+input.info[6, "se_lab"] <- "SE" # Standard error column | String | Mandatory
+input.info[6, "pvalue_lab"] <- "PVALUE" # P-value column (nominal or log10) | String | Mandatory
+input.info[6, "key"] <- 	NA # Column identifying traits (e.g., gene ID) if is_molQTL=TRUE  | String or NA  | Conditional
+input.info[6, "type"] <- "cc" # Trait type: 'quant' or 'cc' | quantitative trait (eQTL) or case control (GWAWS) | Mandatory 
+input.info[6, "is_molQTL"] <- 	FALSE # | TRUE if molecular QTL (eQTL, pQTL); else FALSE | TRUE/FALSE | Mandatory
+input.info[6, "grch"] <- 37 # Genome build (37 or 38) | Integer | Mandatory # Summary files provide information on chromosome, genomic position (NCBI build 37)
+input.info[6, "p_thresh1"] <- 1e-05 #5e-08	#1.00E-05 # # nominal p-value threshold to retain significant association regions (suggested: 5e-08). | Numeric | Mandatory # genome-wide significance threhsold 
+input.info[6, "p_thresh2"] <- 	1e-04 #1e-05 # 1.00E-04 # Nominal p-value threshold to define borders of association regions (suggested: 1e-05). | Numeric | Mandatory # genome-wide suggestive significance threshold
+input.info[6, "hole"] <- 	200000 # Min distance to separate loci (e.g., 250000) | Integer | Mandatory # what is sensible
+input.info[6, "maf"] <- 	0.01 # Minor allele frequency threshold | Numeric (0–1) | Mandatory # from paper: Genetic variants were excluded if genotype call rate <98%, Hardy-Weinberg equilibrium P value < 1 × 10−6 or minor allele frequency <1%.
+input.info[6, "cs_thresh"] <- 	0.95 #  PIP threshold for credible sets (e.g., 0.99) | Numeric (0–1) | Mandatory # reduce to see if get fewer empty
+input.info[6, "grch_bfile"] <- 38 #37 #  Genome build of reference PLINK files (should match grch) | Integer (37 or 38) | Mandatory
+input.info[6, "bfile"] <- "/path/to/dir/genotyping/data/imputed_genotyping_dataset_for_eQTL/POPS2_genotyping_imputed_eQTL_rsid" #  Genome build of reference PLINK files (should match grch) | Integer (37 or 38) | Mandatory # Here I use the POPs2 genotyping dataset as an LD ref because it is a large, all female (X chr), majorly European cohort. X chr is coded as 23
+input.info[6, "chr_lab"] <- "CHR_hg19" # Chromosome column name in GWAS | String | Mandatory
+input.info[6, "pos_lab"] <- "POS_hg19" # Genomic position column name in GWAS | String | Mandatory
+input.info[6, "a1_lab"] <- "EFF" # Effect allele column name | String | Mandatory
+input.info[6, "a0_lab"] <- "REF" # Non-effect allele column name | String | Mandatory
+input.info[6, "n_lab"] <- "TOTALSAMPLESIZE" # Sample size column name | String or NA | Optional
+input.info[6, "study_id"] <- "sPTB_GWAS_EUR_META" # Identifier for the GWAS study | String | Mandatory
+input.info[6, "s"] <- 15419/233290 # s | Proportion of cases (cc only) | Numeric (0–1) or NA | Mandatory # From download website (not paper, n samples differs because 23andme are excluded) Maternal GWAS meta-analysis of preterm delivery in 233,290 women (n cases = 15,419). Data from 23andMe is not included in the meta-analysis.
+input.info[6, "process_bfile"] <- TRUE
+input.info[6,"per_gene_p1"] <- ""
+input.info[6,"per_gene_p2"] <- ""
+```
+
+Next, adjust the sumstats 
+```{r}
+# read them in... 
+sPTB_GWAS_sumstats <- fread(
+  paste0(pops_lustre_path, "input_data/GWAS_summary_stats_for_coloc/EGG_Maternal_GWAMA_allPTD.txt"),
+  header = TRUE,        # the first row is column names
+  sep = "\t",           # TSV
+  stringsAsFactors = FALSE,
+  fill = TRUE           # fill missing columns with NA
+)
+# ensure your data.frame is a data.table
+setDT(sPTB_GWAS_sumstats)
+# fill empty rsids with something 
+# fill missing RSID
+sPTB_GWAS_sumstats[, RSID := fifelse(
+  RSID == "" | is.na(RSID),
+  paste0(CHR_hg19, "_", POS_hg19, "_", REF, "_", EFF),
+  RSID
+)]
+# remove any row where REF and ALT aren't A, C, T or G (to get rid of the D/I deletion/insertion)
+# define allowed alleles
+valid_alleles <- c("A", "C", "T", "G")
+# filter efficiently
+sPTB_GWAS_sumstats <- sPTB_GWAS_sumstats[REF %in% valid_alleles & EFF %in% valid_alleles]
+# this only filters out 6% of rows
+# > 8863383/9348684
+# [1] 0.9480888
+
+# write this back out
+write.table(sPTB_GWAS_sumstats, input.info[6,"input"], sep="\t", quote=F, row.names=F)
+read.table(input.info[6,"input"], nrows = 3, header = TRUE)
+```
+
+# 7. Gestational duration GWAS
+The sPTB GWAS paper states "We present a maternal genome-wide meta-analysis of gestational duration (n = 195,555), identifying 22 associated loci (24 independent variants) and an enrichment in genes differentially expressed during labor. A meta-analysis of preterm delivery (18,797 cases, 260,246 controls) revealed six associated loci and large genetic similarities with gestational duration.”
+Because the sPTB sumstats have so few loci and this paper suggests that gestational duration is the "full" phenotype of preterm birth, I will also coloc with this set of sumstats.
+
+Paper: https://pmc.ncbi.nlm.nih.gov/articles/PMC10101852/
+Sumstat download: https://egg-consortium.org/Gestational-duration-2023.html (EGG_Maternal_GWAMA_GAraw.txt.gz. Maternal GWAS meta-analysis of gestational duration (days) in 151,987 women. Data from 23andMe is not included in the meta-analysis.)
+Downloaded to farm `genotyping/analysis/eQTL/input_data/GWAS_summary_stats_for_coloc/EGG_Maternal_GWAMA_allPTD.txt`
+
+This dataset does appear to have X chr in the sumstats
+
+Make the input table
+```{r}
+# set parameters
+input.info[7,"input"] <- paste0(pops_lustre_path, "input_data/GWAS_summary_stats_for_coloc/EGG_Maternal_GWAMA_GAraw_formatted.txt")
+input.info[7, "rsid_lab"] <- "RSID" # rsID or SNP identifier column name | String | Mandatory
+input.info[7, "freq_lab"] <- "EAF" # Effect allele frequency column name | String or NA | Optional
+input.info[7, "effect_lab"] <- "BETA" # Effect size column (e.g., beta or OR) | String | Mandatory
+input.info[7, "se_lab"] <- "SE" # Standard error column | String | Mandatory
+input.info[7, "pvalue_lab"] <- "PVALUE" # P-value column (nominal or log10) | String | Mandatory
+input.info[7, "key"] <- 	NA # Column identifying traits (e.g., gene ID) if is_molQTL=TRUE  | String or NA  | Conditional
+input.info[7, "type"] <- "quant" # Trait type: 'quant' or 'cc' | quantitative trait (eQTL) or case control (GWAWS) | Mandatory 
+input.info[7, "is_molQTL"] <- 	FALSE # | TRUE if molecular QTL (eQTL, pQTL); else FALSE | TRUE/FALSE | Mandatory
+input.info[7, "grch"] <- 37 # Genome build (37 or 38) | Integer | Mandatory # Summary files provide information on chromosome, genomic position (NCBI build 37)
+input.info[7, "p_thresh1"] <- 1e-05 #5e-08	#1.00E-05 # # nominal p-value threshold to retain significant association regions (suggested: 5e-08). | Numeric | Mandatory # genome-wide significance threhsold 
+input.info[7, "p_thresh2"] <- 	1e-04 #1e-05 # 1.00E-04 # Nominal p-value threshold to define borders of association regions (suggested: 1e-05). | Numeric | Mandatory # genome-wide suggestive significance threshold
+input.info[7, "hole"] <- 	200000 # Min distance to separate loci (e.g., 250000) | Integer | Mandatory # what is sensible
+input.info[7, "maf"] <- 	0.01 # Minor allele frequency threshold | Numeric (0–1) | Mandatory # from paper: Genetic variants were excluded if genotype call rate <98%, Hardy-Weinberg equilibrium P value < 1 × 10−6 or minor allele frequency <1%.
+input.info[7, "cs_thresh"] <- 	0.95 #  PIP threshold for credible sets (e.g., 0.99) | Numeric (0–1) | Mandatory # reduce to see if get fewer empty
+input.info[7, "grch_bfile"] <- 38 #37 #   Genome build of LD reference PLINK files (should match grch if no liftover is used). | Integer (37 or 38) | Mandatory
+input.info[7, "bfile"] <- "/path/to/dir/genotyping/data/imputed_genotyping_dataset_for_eQTL/POPS2_genotyping_imputed_eQTL_rsid" #  Path and file name prefix to PLINK binary files (.bed/.bim/.fam) used for LD computation | File path prefix (string) | Mandatory # Here I use the POPs2 genotyping dataset as an LD ref because it is a large, all female (X chr), majorly European cohort. X chr is coded as 23
+input.info[7, "chr_lab"] <- "CHR_hg19" # Chromosome column name in GWAS | String | Mandatory
+input.info[7, "pos_lab"] <- "POS_hg19" # Genomic position column name in GWAS | String | Mandatory
+input.info[7, "a1_lab"] <- "EFF" # Effect allele column name | String | Mandatory
+input.info[7, "a0_lab"] <- "REF" # Non-effect allele column name | String | Mandatory
+input.info[7, "n_lab"] <- "TOTALSAMPLESIZE" # Sample size column name | String or NA | Optional
+input.info[7, "study_id"] <- "GestDura_GWAS_EUR_META" # Identifier for the GWAS study | String | Mandatory
+input.info[7, "s"] <- NA # s | Proportion of cases (cc only) | Numeric (0–1) or NA | Mandatory # This is a quantitative trait not a CC study 
+input.info[7, "process_bfile"] <- TRUE
+input.info[7,"per_gene_p1"] <- ""
+input.info[7,"per_gene_p2"] <- ""
+```
+
+Adjust the sumstats 
+```{r}
+# read them in... 
+GD_GWAS_sumstats <- fread(
+  paste0(pops_lustre_path, "input_data/GWAS_summary_stats_for_coloc/EGG_Maternal_GWAMA_GAraw.txt"),
+  header = TRUE,        # the first row is column names
+  sep = "\t",           # TSV
+  stringsAsFactors = FALSE,
+  fill = TRUE           # fill missing columns with NA
+)
+# ensure your data.frame is a data.table
+setDT(GD_GWAS_sumstats)
+# remove any row where REF and ALT aren't A, C, T or G (to get rid of the D/I deletion/insertion)
+# define allowed alleles
+valid_alleles <- c("A", "C", "T", "G")
+# filter efficiently
+GD_GWAS_sumstats <- GD_GWAS_sumstats[REF %in% valid_alleles & EFF %in% valid_alleles]
+# this only filters out 4% of rows
+# > 9165126/9471983
+# [1] 0.9676037
+
+# write this back out
+write.table(GD_GWAS_sumstats, input.info[7,"input"], sep="\t", quote=F, row.names=F)
+read.table(input.info[7,"input"], nrows = 3, header = TRUE)
+```
+
+# Finally, write out flanders input table
+```{r}
+write.table(input.info, 
+            paste0(outpath, "POPS2_flanders_input.txt"), 
+            sep="\t", row.names=F, quote=F)
+```
+
+# Run flanders
+
+Run the Flanders pipeline for finemapping and colocalization developed by HT (https://github.com/Biostatistics-Unit-HT/Flanders)
+However, we run this version updated to allow per-gene p-value thresholds by HGI:  
+github.com/wtsi-hgi/Flanders/tree/per-gene-p-value 
+
+```{bash}
+module load HGI/pipelines/flanders/v2026_01_15
+# cd to the correct directory 
+genotyping/analysis/eQTL/output_data/flanders_5
+# run flanders
+flanders --summarystats_input ../../input_data/flanders/POPS2_flanders_input.txt --run_liftover TRUE --susie_max_iter 1000 --pph4_threshold 0.8 --pph3_threshold 0.8 --chromosomes 1-23 -config ../../input_data/flanders/flanders_eQTL_nextflow4.config --publish_susie TRUE
+```
