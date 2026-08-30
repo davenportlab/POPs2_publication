@@ -1,8 +1,8 @@
-# 04_2_format_interval_eQTL_files.R
+# 04_3_format_interval_eQTL_files.R
 
 ################################################################################
 
-# 4.2. Format interval files for eQTL mapping 
+# 4.3. Format interval files for eQTL mapping 
 
 ################################################################################
 
@@ -76,7 +76,7 @@ bim_update_x %>% write.table(paste0(lustre_path, "POPS2_comparison/data_subset/g
                              row.names = FALSE,
                              col.names = FALSE)
 
-# filter the plink file so it is only biallelic SNPs
+# filter the plink file so it is only biallelic SNPs and MAF 0.05
 ################################################################################
 #                     RUN IN BASH
 ################################################################################
@@ -151,13 +151,15 @@ write.table(snps, paste0(output_dir, "snps_for_cis_eqtl_rnaseq_update_10_27_25.t
             row.names = F, col.names = F)
 
 # # make genotyping files with only the snps we will use 
-########## 
+################################################################################
+#                     RUN IN BASH
+################################################################################
 # # start interactive job 
 # fash 20
 # # load module
 # module load HGI/softpack/users/sh50/sh50_geno_qc/1
 # # cd to correct place
-# cd /path/to/interval_rna/POPS2_comparison/data_subset/genotyping
+# cd interval_rna/POPS2_comparison/data_subset/genotyping
 
 # #separate them into different files 
 # mkdir Imputed_Genotyping_Data_byChr
@@ -171,8 +173,8 @@ write.table(snps, paste0(output_dir, "snps_for_cis_eqtl_rnaseq_update_10_27_25.t
 # extract only biallelic snps for eQTL mapping 
 # for CHR in {1..22} ; do plink --bfile /path/to/interval_rna/POPS2_comparison/data_subset/genotyping/Imputed_Genotyping_Data_byChr/Interval_f_u45_chr.${CHR}.imputed.eqtl --extract snps_for_cis_eqtl_rnaseq_update_10_27_25.txt --biallelic-only strict --snps-only just-acgt --recode A --out geno_files_update_10_27_25/Interval_f_u45_genotyping_for_rna-seq_eqtl_${CHR} --allow-extra-chr --chr ${CHR} ; done
 # plink --bfile /path/to/interval_rna/POPS2_comparison/data_subset/genotyping/Imputed_Genotyping_Data_byChr/Interval_f_u45_chr.X.imputed.eqtl --extract snps_for_cis_eqtl_rnaseq_update_10_27_25.txt --biallelic-only strict --snps-only just-acgt --recode A --out geno_files_update_10_27_25/Interval_f_u45_genotyping_for_rna-seq_eqtl_X --allow-extra-chr --chr X
-
 ################################################################################
+
 # assemble all files
 
 # read in gene expression, covariates, sample key, peer factors and make sure they are all in the same order

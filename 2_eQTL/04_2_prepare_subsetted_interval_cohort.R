@@ -265,14 +265,14 @@ scaled_cellprop_plt
 # # cd to correct dir
 # cd interval_rna/recovery_intermediate_files/INTERVAL_RNAseq/genotype
 # 
-# # subset autosomes
+# # subset autosomes to FRA samples
 # plink \
 # --bfile INTERVAL_RNAseq_Phase1-3_imputed_b38_biallelic_MAF0.005_AllAutosomes \
 # --keep ../../../POPS2_comparison/data_subset/Interval_female_less45_geno_sampleIDs.txt \
 # --make-bed \
 # --out ../../../POPS2_comparison/data_subset/genotyping/INTERVAL_RNAseq_imputed_b38_AllAutosomes_female_u45
 # 
-# # subset x chromosome
+# # subset x chromosome to FRA samples
 # plink \
 # --bfile INTERVAL_RNAseq_imputed_b38_biallelic_MAF0.005_chrX \
 # --keep ../../../POPS2_comparison/data_subset/Interval_female_less45_geno_sampleIDs.txt \
