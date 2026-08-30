@@ -9,7 +9,7 @@
 # Aim: Subset interval cohort to females of reproductive age and preprocess data
 
 ########################### Input paths ###########################
-interval_path <- "/lustre/scratch124/humgen/projects_v2/interval_rna/" # TO DO remove
+interval_path <- "projects_v2/interval_rna/" # 
 gtf_inpath <- "rna-seq/data/ref_data/Homo_sapiens.GRCh38.99.gtf"
 
 ########################### Load packages ###########################

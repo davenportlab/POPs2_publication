@@ -9,7 +9,7 @@
 # Aim: Prepare interval files for eQTL mapping 
 
 ########################### Paths ##########################
-lustre_path <- "/lustre/scratch124/humgen/projects_v2/interval_rna/" # TO DO REMOVE
+lustre_path <- "interval_rna/" 
 output_dir <- paste0(lustre_path, "POPS2_comparison/eQTL_input_data/")
 gtf_inpath <- "rna-seq/data/ref_data/Homo_sapiens.GRCh38.99.gtf"
 
