@@ -1,12 +1,12 @@
-# 07_2_time_interaction_eQTL.R
+# 07_3_neutrophil_interaction_eQTL.R
 
 ################################################################################
 
-# 7.2. Run eQTL interaction with time 
+# 7.3. Run eQTL interaction with neutrophils 
 
 ################################################################################
 
-# Aim: Identify eQTL with effects varying by pregnancy time-point
+# Aim: Identify eQTL with effects varying by neutrophil proportion 
 
 ########################### Paths ##########################
 dir <- "genotyping/analysis/eQTL/"
@@ -53,18 +53,18 @@ capture_warnings_and_output <- function(expr) {
 }
 
 
+
 # Test each SNP-gene pair in turn for an interaction
 results <- do.call(rbind, lapply(irange, function(i){
   
-  # Check that there are enough patients in each group that are minor allele homs
-  if ((length(unique(individual[which(geno.int[, pairs.int[i, 2]] == 2
-                                      & timepoint == levels(timepoint)[1])])) > 1 &
-       length(unique(individual[which(geno.int[, pairs.int[i, 2]] == 2
-                                      & timepoint == levels(timepoint)[2])])) > 1) &
-      (length(unique(individual[which(geno.int[, pairs.int[i, 2]] == 2
-                                      & timepoint == levels(timepoint)[3])])) > 1 & 
-       length(unique(individual[which(geno.int[, pairs.int[i, 2]] == 2
-                                      & timepoint == levels(timepoint)[4])])) > 1)){
+  # Check that there are enough patients in each group (above and below 0) that are minor allele homs
+  # In the case of cell proportions, an individual could appear in both groups 
+  if (length(unique(individual[which(geno.int[, pairs.int[i, 2]] == 2
+                                     & covariates[,1] > 0)])) > 1 &
+      length(unique(individual[which(geno.int[, pairs.int[i, 2]] == 2
+                                     & covariates[,1] < 0)])) > 1){
+    
+    # check that the main effect still remains with the inclusion of outcome (outcomes only - this is cell prop)
     
     # is there more than one signal for this gene?
     gene <- pairs.int[i, 1]
@@ -88,7 +88,7 @@ results <- do.call(rbind, lapply(irange, function(i){
                                                        timepoint + # timepoint
                                                        covariates + # covariates
                                                        peer_factors[, 1:n.peer] + # peer factors
-                                                       geno.int[, as.character(pairs.int[i, 2])]*timepoint + # interaction term 
+                                                       geno.int[, as.character(pairs.int[i, 2])]*covariates[,1] + # interaction term 
                                                        (1|individual) + (1|batch), # individual and batch 
                                                      subset = complete.cases(geno.int[, as.character(pairs.int[i, 2])]),
                                                      REML=FALSE))
@@ -111,7 +111,7 @@ results <- do.call(rbind, lapply(irange, function(i){
                                                        timepoint + # timepoint
                                                        covariates + # covariates
                                                        peer_factors[, 1:n.peer] + # peer factors
-                                                       geno.int[, as.character(pairs.int[i, 2])]*timepoint + # interaction term 
+                                                       geno.int[, as.character(pairs.int[i, 2])]*covariates[,1] + # interaction term  
                                                        (1|individual) + (1|batch) +  # individual and batch 
                                                        geno.int[, as.character(other.snps)], # other snps
                                                      subset = complete.cases(geno.int[, as.character(pairs.int[i, 2])]),
@@ -121,25 +121,17 @@ results <- do.call(rbind, lapply(irange, function(i){
     # look at the n minor alleles in each group that actually ended up in each model 
     indx_incl <- as.integer(rownames(model.frame(model.test$result)))
     geno_incl <- geno.int[indx_incl,as.character(pairs.int[i, 2])]
-    tp_incl <- timepoint[indx_incl]
+    neut_incl <- covariates[indx_incl,1]
     ind_incl <- individual[indx_incl]
-    tp1_nminoralleles <- length(unique(ind_incl[which(geno_incl == 2
-                                                      & tp_incl == levels(timepoint)[1])]))
-    tp2_nminoralleles <- length(unique(ind_incl[which(geno_incl == 2
-                                                      & tp_incl == levels(timepoint)[2])]))
-    tp3_nminoralleles <- length(unique(ind_incl[which(geno_incl == 2
-                                                      & tp_incl == levels(timepoint)[3])]))
-    tp4_nminoralleles <- length(unique(ind_incl[which(geno_incl == 2
-                                                      & tp_incl == levels(timepoint)[4])]))
+    bottom_half_nminoralleles <- length(unique(ind_incl[which(geno_incl == 2
+                                                              & neut_incl < 0)]))
+    top_half_nminoralleles <- length(unique(ind_incl[which(geno_incl == 2
+                                                           & neut_incl > 0)]))
     
     c(summary(model.test$result)$coefficients[1,], # get results info for the genotype
-      summary(model.test$result)$coefficients["timepoint12_weeks",], # get results for 12 week time-point (the different intercepts)
-      summary(model.test$result)$coefficients["timepoint20_weeks",], # get results for 20 week time-point (the different intercepts)
-      summary(model.test$result)$coefficients["timepoint28_weeks",], # get results for 28 week time-point (the different intercepts)
-      summary(model.test$result)$coefficients["timepoint36_weeks",], # get results for 36 week time-point (the different intercepts)
-      summary(model.test$result)$coefficients[dim(summary(model.test$result)$coefficients)[1]-2,], # get interaction results for 20 weeks
-      summary(model.test$result)$coefficients[dim(summary(model.test$result)$coefficients)[1]-1,], # get interaction results for 28 weeks
-      summary(model.test$result)$coefficients[dim(summary(model.test$result)$coefficients)[1],], # get interaction results for 36 weeks
+      summary(model.test$result)$coefficients["covariatesNeutrophils_centered",], # get results for neutrophils
+      summary(model.test$result)$coefficients["geno.int[, as.character(pairs.int[i, 2])]:covariates[, 1]",], # get interaction results for neutrophils
+      #summary(model.test$result)$coefficients[dim(summary(model.test$result)$coefficients)[1],], # get interaction results for neutrophils
       anova(model.null$result, model.test$result)$'Pr(>Chisq)'[2], # pval of interaction model 
       length(model.null$warnings) > 0, # model warnings 
       length(model.test$warnings) > 0, # model warnings 
@@ -149,52 +141,21 @@ results <- do.call(rbind, lapply(irange, function(i){
       any(grepl("Hessian", model.test$result@optinfo$conv$lme4$messages)), # specific convergence warning - hessian 
       any(grepl("singular", model.null$result@optinfo$conv$lme4$messages)), # singular fit
       any(grepl("singular", model.test$result@optinfo$conv$lme4$messages)), # singular fit
-      tp1_nminoralleles, # tp 1 n minor alleles in the final fit model 
-      tp2_nminoralleles, # tp 2 n minor alleles in the final fit model 
-      tp3_nminoralleles, # tp 3 n minor alleles in the final fit model 
-      tp4_nminoralleles, # tp 4 n minor alleles in the final fit model 
+      bottom_half_nminoralleles, # bottom half neutrophil distribution n minor alleles in the final fit model 
+      top_half_nminoralleles, # top half neutrophil distribution n minor alleles in the final fit model 
       "tested")
     
   } else {
     # if there are not enouch patients in each group that are minor allele homs -> return NA
-    c(rep(NA, 37), "untested_minor_allele_homs")
+    c(rep(NA, 20), "untested_minor_allele_homs")
   }
   
   
 }))
 
-colnames(results) <- c("eQTL_beta_baseline",
-                       "eQTL_SE_baseline",
-                       "eQTL_t_baseline",
-                       
-                       "expr_mean_wk12",
-                       "expr_se_wk12",
-                       "expr_t_wk12",
-                       
-                       "expr_mean_wk20",
-                       "expr_se_wk20",
-                       "expr_t_wk20",
-                       
-                       "expr_mean_wk28",
-                       "expr_se_wk28",
-                       "expr_t_wk28",
-                       
-                       "expr_mean_wk36",
-                       "expr_se_wk36",
-                       "expr_t_wk36",
-                       
-                       "eqtl_diff_wk20_interaction",
-                       "eqtl_diff_SE_wk20_interaction",
-                       "eqtl_diff_t_wk20_interaction",
-                       
-                       "eqtl_diff_wk28_interaction",
-                       "eqtl_diff_SE_wk28_interaction",
-                       "eqtl_diff_t_wk28_interaction",
-                       
-                       "eqtl_diff_wk36_interaction",
-                       "eqtl_diff_SE_wk36_interaction",
-                       "eqtl_diff_t_wk36_interaction",
-                       
+colnames(results) <- c("eqtl_beta_mean_neut", "eqtl_SE_mean_neut", "eqtl_t_mean_neut",
+                       "neut_effect_expr", "neut_effect_expr_SE", "neut_eff_expr_t",
+                       "eqtl_neut_interaction", "eqtl_neut_interaction_se", "eqtl_neut_interaction_t",
                        "Interaction_pval",
                        "model_warnings_null", 
                        "model_warnings_test", 
@@ -204,16 +165,12 @@ colnames(results) <- c("eQTL_beta_baseline",
                        "hess_warnings_test", 
                        "singular_fit_null", 
                        "singular_fit_test", 
-                       
-                       "tp1_nminoralleles", 
-                       "tp2_nminoralleles", 
-                       "tp3_nminoralleles", 
-                       "tp4_nminoralleles",
-                       
+                       "bottom_half_nminoralleles",
+                       "top_half_nminoralleles",
                        "reason_not_tested")
 
 results <- data.frame(Gene = pairs.int[irange, 1],
                       SNP = pairs.int[irange, 2], 
                       results)
 
-saveRDS(results, paste0(dir, "output_data/interactions_flanders_2/tp_int_results_flanders_2.rds"))
+saveRDS(results, paste0(dir, "output_data/interactions_flanders_2/neutrophil_int_results_flanders_2.rds"))
