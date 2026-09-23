@@ -232,7 +232,7 @@ write.table(counts_named_compact, paste0(interval_path, "POPS2_comparison/cibers
 # # cd to correct dir 
 # cd interval_rna/POPS2_comparison/cibersort/
 # # run cibersort on docker 
-# run_cibersortx_fractions --input-dir ./Input --output-dir ./Output_myprocess --username sh50@sanger.ac.uk --token 9b4ce342b412537428e7d0ad6c2a8207 --mixture Interval_cibersort_input_counts_myprocess.tsv --sigmatrix LM22.txt --rmbatchBmode TRUE --perm 100 --verbose TRUE --QN FALSE
+# run_cibersortx_fractions --input-dir ./Input --output-dir ./Output_myprocess --username sh50@sanger.ac.uk --token <your token> --mixture Interval_cibersort_input_counts_myprocess.tsv --sigmatrix LM22.txt --rmbatchBmode TRUE --perm 100 --verbose TRUE --QN FALSE
 ################################################################################
 
 # read in the results 
