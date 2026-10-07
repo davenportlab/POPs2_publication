@@ -521,7 +521,7 @@ plot_interval_pops_coloc <- function(coloc.results_crossdataset_pops, i, finemap
   #pops_eQTL_hit <- coloc.results_crossdataset %>% dplyr::filter(eGene_name == gene_name, GWAS_hit == gwas_hit, eQTL_dataset == "POPs2_bulk_all", eQTL_hit == eQTL_hit_i) %>% pull(eQTL_hit)
   #pops_eQTL_hit <- coloc.results_crossdataset %>% dplyr::filter(eGene_name == gene_name, GWAS_hit == gwas_hit, eQTL_dataset == "POPs2_bulk_all") %>% slice_max(PP.H4.abf, n = 1) %>% pull(eQTL_hit)
   pops_pph4 = coloc.results_crossdataset %>% dplyr::filter(eGene_name == gene_name, GWAS_hit == gwas_hit, eQTL_dataset == "POPs2_bulk_all", eQTL_hit == pops_eQTL_hit) %>% pull(PP.H4.abf)
-  ld_inpath <- paste0("/lustre/scratch125/humgen/projects_v2/pops2/genotyping/analysis/eQTL/output_data/coloc_LD/", gwas_dataset, "_chr", chr, "_", lead_pos, ".ld")
+  ld_inpath <- paste0(path_lustre, "output_data/coloc_LD/", gwas_dataset, "_chr", chr, "_", lead_pos, ".ld")
   
   
   pops_eQTL_susie_path <- finemapped.loci_pops %>% dplyr::filter(credible_set_name == pops_eQTL_hit) %>% pull(path_rds)
